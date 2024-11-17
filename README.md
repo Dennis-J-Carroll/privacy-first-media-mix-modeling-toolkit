@@ -33,24 +33,13 @@ The project generates six key visualizations:
 
 
 
-![Correlation Matrix](plots/correlation_matrix.png) 
-
-![Feature Importance](plots/feature_importance.png) 
-
-![Value Analysis](plots/value_analysis.png)
 
 ## Model Performance
 Random Forest Classifier Results:
 - Overall Accuracy: 92%
 - Precision: 93% (Non-churn), 90% (Churn)
 - Recall: 96% (Non-churn), 81% (Churn)
-
-
-![Service Analysis](plots/service_analysis.png) 
-![Reasons](plots/churn_reasons.png) 
-
-
-
+ 
 
 ## Requirements
 - Python 3.x
