@@ -6,11 +6,6 @@ This project analyzes customer churn in a telecommunications company using machi
 This project analyzes customer churn in a telecommunications company using machine learning and data visualization techniques. The analysis includes customer demographics, service usage patterns, and predictive modeling to identify key factors contributing to customer churn.
 
 ![Demographics](plots/churn_demographics.png)
-![Reasons](plots/churn_reasons.png) 
-![Correlation Matrix](plots/correlation_matrix.png) 
-![Feature Importance](plots/feature_importance.png) 
-![Service Analysis](plots/service_analysis.png) 
-![Value Analysis](plots/value_analysis.png)
 
 
 
@@ -36,11 +31,26 @@ The project generates six key visualizations:
 5. Correlation Analysis
 6. Feature Importance in Churn Prediction
 
+
+
+![Correlation Matrix](plots/correlation_matrix.png) 
+
+![Feature Importance](plots/feature_importance.png) 
+
+![Value Analysis](plots/value_analysis.png)
+
 ## Model Performance
 Random Forest Classifier Results:
 - Overall Accuracy: 92%
 - Precision: 93% (Non-churn), 90% (Churn)
 - Recall: 96% (Non-churn), 81% (Churn)
+
+
+![Service Analysis](plots/service_analysis.png) 
+![Reasons](plots/churn_reasons.png) 
+
+
+
 
 ## Requirements
 - Python 3.x
