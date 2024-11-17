@@ -1,11 +1,18 @@
 # Telco Customer Churn Analysis
 
-## Overview
-# Telco Customer Churn Analysis
 
 ## 📊 Project Overview
 This project analyzes customer churn in a telecommunications company using machine learning and data visualization techniques. The analysis is based on the [IBM Telco Customer Churn Dataset from Kaggle](https://www.kaggle.com/datasets/yeanzc/telco-customer-churn-ibm-dataset). The analysis includes customer demographics, service usage patterns, and predictive modeling to identify key factors contributing to customer churn.
 This project analyzes customer churn in a telecommunications company using machine learning and data visualization techniques. The analysis includes customer demographics, service usage patterns, and predictive modeling to identify key factors contributing to customer churn.
+
+![Demographics](plots/churn_demographics.png)
+![Reasons](plots/churn_reasons.png) 
+![Correlation Matrix](plots/correlation_matrix.png) 
+![Feature Importance](plots/feature_importance.png) 
+![Service Analysis](plots/service_analysis.png) 
+![Value Analysis](plots/value_analysis.png)
+
+
 
 ## Project Structure
 - `PRO_1.py`: Initial exploratory data analysis and basic statistics
