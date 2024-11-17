@@ -1,0 +1,133 @@
+# Telco Customer Churn Analysis
+
+## 📊 Project Overview
+This project analyzes customer churn in a telecommunications company using machine learning and data visualization techniques. The analysis is based on the [IBM Telco Customer Churn Dataset from Kaggle](https://www.kaggle.com/datasets/yeanzc/telco-customer-churn-ibm-dataset). The analysis includes customer demographics, service usage patterns, and predictive modeling to identify key factors contributing to customer churn.
+This project analyzes customer churn in a telecommunications company using machine learning and data visualization techniques. The analysis includes customer demographics, service usage patterns, and predictive modeling to identify key factors contributing to customer churn.
+
+
+![Demographics](plots/churn_demographics.png)
+![Reasons](plots/churn_reasons.png) 
+![Correlation Matrix](plots/correlation_matrix.png) 
+![Feature Importance](plots/feature_importance.png) 
+![Service Analysis](plots/service_analysis.png) 
+![Value Analysis](plots/value_analysis.png)
+
+
+
+
+
+## 🎯 Key Features
+- Comprehensive exploratory data analysis (EDA)
+- Customer demographic analysis
+- Service usage pattern visualization
+- Customer lifetime value (CLTV) analysis
+- Churn prediction using Random Forest Classifier
+- Feature importance analysis
+- Detailed visualization of key metrics
+
+## 🗃️ Dataset
+The analysis uses the IBM Telco Customer Churn dataset from Kaggle, which includes:
+- Customer demographics (age, gender, dependents)
+- Account information (tenure, contract type, payment method)
+- Services used (internet type, phone service, security)
+- Charges (monthly charges, total charges)
+- Churn status and reasons
+- Customer Lifetime Value (CLTV)
+
+## 📁 Project Structure
+```
+├── PRO_1.py           # Basic data analysis and statistics
+├── PRO_2.py           # Advanced analysis and ML modeling
+├── telco.csv          # Dataset (not included in repo)
+└── plots/             # Generated visualization plots
+    ├── churn_demographics.png
+    ├── value_analysis.png
+    ├── service_analysis.png
+    ├── churn_reasons.png
+    ├── correlation_matrix.png
+    └── feature_importance.png
+```
+
+## 🛠️ Requirements
+- Python 3.x
+- Required packages:
+  - numpy
+  - pandas
+  - matplotlib
+  - seaborn
+  - scikit-learn
+
+Install required packages using:
+```bash
+pip install -r requirements.txt
+```
+
+## 🚀 Usage
+
+0. Download the dataset:
+- Download the `telco.csv` file from [Kaggle](https://www.kaggle.com/datasets/yeanzc/telco-customer-churn-ibm-dataset)
+- Place it in your project root directory
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/telco-churn-analysis.git
+```
+
+2. Navigate to the project directory:
+```bash
+cd telco-churn-analysis
+```
+
+3. Run the basic analysis:
+```bash
+python PRO_1.py
+```
+
+4. Run the advanced analysis and modeling:
+```bash
+python PRO_2.py
+```
+
+## 📈 Analysis Components
+
+### 1. Basic Analysis (PRO_1.py)
+- Data overview and quality checks
+- Basic customer demographics
+- Initial churn analysis
+- Customer value metrics
+- Age group distribution
+- Gender-based churn patterns
+
+### 2. Advanced Analysis (PRO_2.py)
+- Detailed visualizations
+- Customer lifetime value analysis
+- Service usage patterns
+- Churn reason analysis
+- Correlation analysis
+- Predictive modeling using Random Forest
+- Feature importance analysis
+
+## 📊 Key Insights
+The analysis provides several valuable insights:
+- Customer demographics and their relationship with churn
+- Service usage patterns and their impact on customer retention
+- Key factors influencing customer churn
+- Predictive model performance in identifying potential churners
+- Customer lifetime value analysis
+
+## 📉 Visualizations
+The project generates several visualization plots:
+1. Churn Demographics: Customer distribution and demographic analysis
+2. Value Analysis: CLTV, monthly charges, and tenure analysis
+3. Service Analysis: Internet type, contract type, and payment method patterns
+4. Churn Reasons: Top 10 reasons for customer churn
+5. Correlation Matrix: Relationships between numerical variables
+6. Feature Importance: Key predictors in the churn model
+
+## 🤝 Contributing
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## 📝 License
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## 👥 Contact
+For any questions or feedback, please reach out to Dennis Carroll at denniscarrollj@gmail.com
