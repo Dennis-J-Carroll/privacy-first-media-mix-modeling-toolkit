@@ -38,6 +38,7 @@ The analysis uses the IBM Telco Customer Churn dataset from Kaggle, which includ
 ```
 ├── PRO_1.py           # Basic data analysis and statistics
 ├── PRO_2.py           # Advanced analysis and ML modeling
+├── plotly_visuals.py  # Interactive Plotly charts
 ├── telco.csv          # Dataset (not included in repo)
 └── plots/             # Generated visualization plots
     ├── churn_demographics.png
@@ -56,6 +57,7 @@ The analysis uses the IBM Telco Customer Churn dataset from Kaggle, which includ
   - matplotlib
   - seaborn
   - scikit-learn
+  - plotly
 
 Install required packages using:
 ```bash
@@ -85,6 +87,7 @@ python PRO_1.py
 4. Run the advanced analysis and modeling:
 ```bash
 python PRO_2.py
+python plotly_visuals.py  # generate interactive HTML visuals
 ```
 
 ## 📈 Analysis Components
