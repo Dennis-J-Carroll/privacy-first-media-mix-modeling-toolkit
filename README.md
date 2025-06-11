@@ -13,6 +13,7 @@ This project analyzes customer churn in a telecommunications company using machi
 - `PRO_1.py`: Initial exploratory data analysis and basic statistics
 - `PRO_2.py`: Advanced analysis with visualizations and machine learning model
 - `analysis_summary.py`: Executive summary with key findings and recommendations
+- `plotly_visuals.py`: Generates interactive Plotly charts
 - `plots/`: Directory containing generated visualizations
 - `telco.csv`: Original dataset
 
@@ -30,6 +31,8 @@ The project generates six key visualizations:
 4. Top Churn Reasons
 5. Correlation Analysis
 6. Feature Importance in Churn Prediction
+Interactive versions of these visuals are generated with Plotly and saved
+as HTML files in `plots/interactive` when running `plotly_visuals.py`.
 
 
 
@@ -48,6 +51,7 @@ Random Forest Classifier Results:
 - matplotlib
 - seaborn
 - scikit-learn
+- plotly
 
 ## Usage
 1. Clone the repository
@@ -56,6 +60,7 @@ Random Forest Classifier Results:
    ```bash
    python3 PRO_1.py
    python3 PRO_2.py
+   python3 plotly_visuals.py  # generates interactive charts
    python3 analysis_summary.py
    ```
 
