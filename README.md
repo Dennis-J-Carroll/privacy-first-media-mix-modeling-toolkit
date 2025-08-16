@@ -87,7 +87,7 @@ Based on analysis and industry benchmarks, here are strategies to reduce churn:
 
 
 -------------------------------------------
-**For a deeper dive, see** recommendations.md.
+**For a deeper dive, see** [recommendations](https://github.com/Dennis-J-Carroll/telco-churn-analysis/blob/main/recommendations.md)
 
 License
 
