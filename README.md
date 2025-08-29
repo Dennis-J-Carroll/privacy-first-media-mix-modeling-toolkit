@@ -1,94 +1,25 @@
-## Telco Customer Churn Analysis
+# Privacy-First Media Mix Modeling Toolkit
 
-### 📊 Project Overview
+## Overview
 
-This project analyzes customer churn in a telecommunications company using machine learning and data visualization techniques. The analysis is based on the IBM Telco Customer Churn Dataset from Kaggle. The analysis includes customer demographics, service usage patterns, and predictive modeling to identify key factors contributing to customer churn.
+This repository provides a toolkit for media mix modeling that respects user privacy. Marketing teams and analysts can estimate the incremental impact of different marketing channels (e.g., TV, search, social, email) on key outcomes such as conversions or revenue without relying on user‑level tracking. Instead, the toolkit uses aggregated and anonymized data to build robust models.
 
-![Demographics](plots/churn_demographics.png)
+## Features
 
+- **Aggregated Data Pipelines**: Ingest channel‑level spend, impressions, and conversions aggregated over time, ensuring no personal data is collected.
+- **Modeling Frameworks**: Includes baseline linear models and advanced Bayesian hierarchical models to estimate channel contribution while accounting for saturation and ad‑stock effects.
+- **Privacy Preservation**: Demonstrates how to apply techniques such as differential privacy to add noise to input data so individual consumers cannot be identified.
+- **Visualization Tools**: Generate charts that show marginal return curves, channel saturation, and expected lift versus spend, helping stakeholders understand media efficiency.
+- **Extensible Design**: Modular codebase so analysts can plug in their own data sources, priors, and model structures.
 
+## Getting Started
 
+1. Clone the repository and install dependencies listed in `requirements.txt`.
+2. Place your aggregated channel data in the `data/` directory following the provided schema.
+3. Run the example notebook in `PRO_1.py` to explore a simple MMM using synthetic data.
+4. Use `analysis_summary.py` to produce a summary report of channel efficiencies.
+5. Check `recommendations.md` for guidance on interpreting model outputs and making investment decisions.
 
+## Business Impact
 
-### Figure 1: Churn distribution by status, age distribution, and gender breakdown. Shows overall churn rate (~26.5%), age spread differences, and that churn is balanced across genders.
-
-
-## Project Structure
-- `PRO_1.py`: Initial exploratory data analysis and basic statistics
-- `PRO_2.py`: Advanced analysis with visualizations and machine learning model
-- `analysis_summary.py`: Executive summary with key findings and recommendations
-- `plots/`: Directory containing generated visualizations
-- `telco.csv`: Original dataset
-
-## Key Findings
-- Overall churn rate: 26.54%
-- Fiber Optic service has highest churn rate (40.72%)
-- Top churn reasons are competitor-related (better devices, better offers)
-- Model achieves 92% accuracy in predicting churn
-
-## Visualizations
-The project generates six key visualizations:
-- Customer Demographics Analysis
-- Customer Value Analysis
-- Service Usage Patterns
-- Top Churn Reasons
-- Correlation Analysis
-- Feature Importance in Churn Prediction
-
-
-
-
-## Model Performance
-Random Forest Classifier Results:
-- Overall Accuracy: 92%
-- Precision: 93% (Non-churn), 90% (Churn)
-- Recall: 96% (Non-churn), 81% (Churn)
- 
-
-## Requirements
-- Python 3.x
-- pandas
-- numpy
-- matplotlib
-- seaborn
-- scikit-learn
-
-## Usage
-1. Clone the repository
-2. Ensure all required packages are installed
-3. Run the scripts in order:
-   ```bash
-   python3 PRO_1.py
-   python3 PRO_2.py
-   python3 analysis_summary.py
-   ```
-
-## 📊 Recommendations
-
-Based on analysis and industry benchmarks, here are strategies to reduce churn:
-
-### Service Improvement:
-
-1. Fiber Optic Quality: Fiber customers churn at ~0.84% vs. ~2% for DSL/cable (Leichtman Research Group, 2023).
-2. Device Offerings: 43% of customers say device upgrade options drive loyalty (Deloitte, 2022).
-3. Competitive Pricing: Verizon lowered churn after reducing its 40% premium to ~15%.
-
-### Customer Support:
-
-1. Staff Training: 56% of telecom churn is due to poor service (Accenture, 2021).
-2. Satisfaction Surveys: Quarterly surveys cut churn by 12–15%.
-3. Proactive Support: Predictive outreach reduces churn by ~30% (McKinsey, 2022).
-
-### Retention Strategy:
-
-1. High-Risk Customers: Predictive models improve retention efficiency by 25–30% (BCG, 2022).
-2. Counter-Offers: Personalized offers reduce churn by 15–20% (Forrester, 2021).
-3. Early Tenure: Month-to-month churn = 42.7% vs. 2.8–11.3% for long-term (Medium, 2023).
-
-
--------------------------------------------
-**For a deeper dive, see** [recommendations](https://github.com/Dennis-J-Carroll/telco-churn-analysis/blob/main/recommendations.md)
-
-License
-
-MIT License
+By modeling marketing spend at an aggregated level and applying privacy‑preserving techniques, this toolkit allows companies to optimize their media budgets without violating consumer trust or privacy regulations. Teams can identify the most efficient channels and reallocate budgets to maximize ROI while complying with privacy laws.
