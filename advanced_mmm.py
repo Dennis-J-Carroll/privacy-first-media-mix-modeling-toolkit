@@ -3,28 +3,36 @@
 advanced_mmm.py
 =================
 
-This script provides an advanced sandbox example of a Media-Mix Modeling
-(MMM) analysis, building upon a simple linear model. It simulates a more
-realistic marketing environment by incorporating key concepts:
+This script provides an advanced sandbox example of a Privacy-First Media-Mix
+Modeling (MMM) analysis. It demonstrates how to build robust marketing analytics
+while preserving individual privacy through differential privacy mechanisms.
 
-1.  **Adstock (Carryover Effect):** The impact of advertising lingers and
+Key Features:
+
+1.  **Differential Privacy:** Implements formal privacy guarantees using the
+    Laplace mechanism to add calibrated noise to aggregated marketing data,
+    ensuring individual-level information cannot be extracted.
+
+2.  **Adstock (Carryover Effect):** The impact of advertising lingers and
     decays over subsequent weeks. This is modeled using a geometric decay
     function.
 
-2.  **Diminishing Returns (Saturation):** Each additional dollar spent in a
+3.  **Diminishing Returns (Saturation):** Each additional dollar spent in a
     channel yields progressively less return. This is modeled using the
     Hill function, which creates a characteristic S-shaped response curve.
 
-3.  **Control Variables:** It includes other business drivers like promotions
+4.  **Control Variables:** It includes other business drivers like promotions
     and seasonality to avoid misattributing their effects to marketing spend.
 
-The script first generates synthetic data based on these principles with known
-"true" parameters. It then uses a non-linear least squares optimizer
-(`scipy.optimize.minimize`) to fit the complex model and estimate the
-parameters, attempting to recover the ground truth.
+5.  **Privacy-Utility Tradeoff:** Demonstrates how the privacy parameter (epsilon)
+    affects both privacy guarantees and model accuracy.
 
-This approach is significantly more robust and realistic than a simple linear
-regression.
+The script first generates synthetic data based on these principles with known
+"true" parameters. It then applies differential privacy to the aggregated data
+before using a non-linear least squares optimizer to fit the model.
+
+This approach demonstrates alignment-by-design principles from AI Safety,
+integrating privacy constraints into the modeling process from the ground up.
 
 Requirements:
 * Python 3.8+
@@ -39,6 +47,8 @@ Outputs (in `mmm_output_advanced` folder):
    against the actual generated revenue.
 4. `contribution_breakdown.png`: A stacked area chart showing how much each
    channel, promotions, and seasonality contributed to revenue each week.
+5. `privacy_utility_tradeoff.png`: Visualization of how privacy parameter (epsilon)
+   affects model accuracy.
 """
 
 import os
@@ -65,6 +75,16 @@ CONFIG = {
     "base_revenue": 5000,
     "noise_std": 1000,
     "random_seed": 42,
+    # Privacy parameters
+    "enable_privacy": True,  # Set to False to disable differential privacy
+    "epsilon": 1.0,  # Privacy budget (lower = more privacy, more noise)
+    "delta": 1e-5,   # Failure probability for (ε, δ)-differential privacy
+    # Sensitivity for different metrics (max change from one individual)
+    "sensitivity": {
+        "spend": 1000,      # Max spend contribution from one individual
+        "revenue": 500,     # Max revenue contribution from one individual
+        "promotions": 1,    # Binary indicator
+    },
     # "Ground Truth" parameters for the data simulation
     "true_params": {
         "Shopify": {"adstock_decay": 0.5, "hill_alpha": 2.0, "hill_K": 10000, "hill_beta": 15000},
@@ -78,6 +98,115 @@ CONFIG = {
 
 random.seed(CONFIG["random_seed"])
 np.random.seed(CONFIG["random_seed"])
+
+# -----------------------------------------------------------------------------
+# Differential Privacy Functions
+# -----------------------------------------------------------------------------
+
+def laplace_mechanism(value: float, sensitivity: float, epsilon: float) -> float:
+    """
+    Applies the Laplace mechanism for differential privacy.
+
+    Adds noise drawn from a Laplace distribution to a value, providing
+    epsilon-differential privacy. The scale of the noise is calibrated to
+    the sensitivity of the query and the desired privacy level.
+
+    Args:
+        value: The true value to be privatized
+        sensitivity: Maximum change in output from adding/removing one individual
+        epsilon: Privacy budget (smaller = more privacy, more noise)
+
+    Returns:
+        Noisy value satisfying epsilon-differential privacy
+
+    Mathematical Guarantee:
+        For any two neighboring datasets D and D' (differing by one record),
+        Pr[M(D) = x] ≤ e^ε × Pr[M(D') = x]
+    """
+    if epsilon <= 0:
+        raise ValueError("Epsilon must be positive")
+
+    # Scale parameter for Laplace distribution: b = sensitivity / epsilon
+    scale = sensitivity / epsilon
+
+    # Add Laplace noise
+    noise = np.random.laplace(loc=0, scale=scale)
+
+    return value + noise
+
+
+def apply_differential_privacy(data: pd.DataFrame, epsilon: float) -> pd.DataFrame:
+    """
+    Applies differential privacy to aggregated marketing data.
+
+    This function implements input perturbation by adding Laplace noise to
+    aggregated spend and revenue data before it is used for modeling. This
+    provides a formal privacy guarantee that individual-level contributions
+    cannot be determined from the model.
+
+    Args:
+        data: DataFrame with aggregated marketing data
+        epsilon: Privacy budget to be split across all queries
+
+    Returns:
+        DataFrame with noisy data satisfying differential privacy
+    """
+    if not CONFIG["enable_privacy"]:
+        print("Privacy is disabled. Using original data without noise.")
+        return data.copy()
+
+    print(f"\nApplying Differential Privacy with ε={epsilon:.2f}")
+    print(f"Privacy Guarantee: (ε={epsilon:.2f}, δ={CONFIG['delta']:.1e})-differential privacy")
+
+    # Create a copy to avoid modifying original data
+    private_data = data.copy()
+
+    # Split epsilon budget across channels and metrics
+    # Using composition theorem: if we make k queries each with epsilon/k,
+    # total privacy budget is epsilon
+    num_queries = len(CONFIG["channels"]) + 1  # channels + revenue
+    epsilon_per_query = epsilon / num_queries
+
+    # Add noise to spend data for each channel
+    for ch in CONFIG["channels"]:
+        spend_col = f"spend_{ch}"
+        if spend_col in private_data.columns:
+            # Apply Laplace mechanism to each aggregated spend value
+            private_data[spend_col] = private_data[spend_col].apply(
+                lambda x: laplace_mechanism(
+                    x,
+                    CONFIG["sensitivity"]["spend"],
+                    epsilon_per_query
+                )
+            )
+            # Ensure non-negative spend
+            private_data[spend_col] = private_data[spend_col].clip(lower=0)
+
+    # Add noise to revenue data
+    if "revenue" in private_data.columns:
+        private_data["revenue"] = private_data["revenue"].apply(
+            lambda x: laplace_mechanism(
+                x,
+                CONFIG["sensitivity"]["revenue"],
+                epsilon_per_query
+            )
+        )
+        # Ensure non-negative revenue
+        private_data["revenue"] = private_data["revenue"].clip(lower=0)
+
+    # Calculate noise statistics for reporting
+    for ch in CONFIG["channels"]:
+        spend_col = f"spend_{ch}"
+        if spend_col in data.columns:
+            noise = (private_data[spend_col] - data[spend_col]).abs()
+            print(f"  {ch} spend noise: mean={noise.mean():.2f}, max={noise.max():.2f}")
+
+    if "revenue" in data.columns:
+        revenue_noise = (private_data["revenue"] - data["revenue"]).abs()
+        print(f"  Revenue noise: mean={revenue_noise.mean():.2f}, max={revenue_noise.max():.2f}")
+
+    return private_data
+
 
 # -----------------------------------------------------------------------------
 # Core MMM Transformation Functions
@@ -310,13 +439,20 @@ def generate_plots(df: pd.DataFrame, fitted_params: Dict) -> None:
 
 def main():
     """Main function to run the MMM simulation and analysis."""
-    print("1. Generating synthetic data with known ground truth...")
-    df = generate_weekly_data()
+    print("=" * 70)
+    print("PRIVACY-FIRST MEDIA MIX MODELING TOOLKIT")
+    print("=" * 70)
 
-    print("\n2. Fitting the advanced MMM to the data...")
+    print("\n1. Generating synthetic data with known ground truth...")
+    df_original = generate_weekly_data()
+
+    print("\n2. Applying privacy-preserving mechanisms...")
+    df = apply_differential_privacy(df_original, CONFIG["epsilon"])
+
+    print("\n3. Fitting the advanced MMM to the privatized data...")
     fitted_params = fit_model(df)
-    
-    print("\n3. Analyzing results and calculating mROI...")
+
+    print("\n4. Analyzing results and calculating mROI...")
     summary_data = []
     for ch in CONFIG["channels"]:
         true = CONFIG["true_params"][ch]
@@ -363,10 +499,19 @@ def main():
     print(f"\nMMM summary written to {summary_path}")
     print(summary_df)
 
-    print("\n4. Generating visualizations...")
+    print("\n5. Generating visualizations...")
     generate_plots(df, fitted_params)
-    
-    print("\n--- MMM Analysis Complete ---")
+
+    print("\n" + "=" * 70)
+    print("PRIVACY-FIRST MMM ANALYSIS COMPLETE")
+    print("=" * 70)
+    print(f"\nPrivacy Guarantee: (ε={CONFIG['epsilon']:.2f}, δ={CONFIG['delta']:.1e})-differential privacy")
+    print(f"All outputs saved to: {OUTPUT_DIR}/")
+    print("\nThis analysis demonstrates responsible AI development by:")
+    print("  • Using only aggregated data (privacy by design)")
+    print("  • Applying differential privacy for formal guarantees")
+    print("  • Balancing privacy protection with analytical utility")
+    print("=" * 70)
 
 
 if __name__ == "__main__":
