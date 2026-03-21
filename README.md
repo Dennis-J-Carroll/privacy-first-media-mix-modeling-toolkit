@@ -284,6 +284,40 @@ jupyter notebook examples/interactive_privacy_tuning.ipynb
 **Recommended learning path:**
 1. Start with the parameter sweep to see the full landscape
 2. Explore the interactive notebook to develop hands-on intuition
+
+### 📱 Mobile Web App
+
+For the best mobile experience, we provide a **Streamlit-based web app** that works perfectly on phones and tablets:
+
+```bash
+streamlit run mmm_mobile_app.py
+```
+
+**Features:**
+- **Touch-optimized interface** with mobile-friendly sliders and buttons
+- **Real-time privacy exploration** - adjust epsilon and see instant results
+- **Responsive visualizations** that adapt to any screen size
+- **Works on all devices** - iOS, Android, tablets, and desktops
+- **No installation needed** for end users (when deployed to cloud)
+
+**Deploy to Streamlit Cloud (FREE):**
+
+1. Push your repo to GitHub
+2. Go to [streamlit.io/cloud](https://share.streamlit.io)
+3. Connect your repo and deploy
+4. Share the URL - works on any phone!
+
+See **[MOBILE_DEPLOYMENT_GUIDE.md](MOBILE_DEPLOYMENT_GUIDE.md)** for detailed instructions, including:
+- Local testing on your phone
+- Step-by-step cloud deployment
+- Mobile optimization tips
+- Troubleshooting guide
+
+**Perfect for:**
+- Testing on mobile devices during development
+- Sharing with non-technical stakeholders
+- Educational demonstrations
+- Remote collaboration
 3. Read the decision guide (below) for structured selection framework
 4. Document your chosen epsilon with clear justification
 

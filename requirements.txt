@@ -11,3 +11,6 @@ xgboost
 jupyter>=1.0.0
 ipywidgets>=8.0.0
 notebook>=7.0.0
+
+# Mobile web app dependencies
+streamlit>=1.28.0

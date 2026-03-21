@@ -1,0 +1,17 @@
+[theme]
+# Mobile-optimized color scheme
+primaryColor = "#4A90E2"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F5F7FA"
+textColor = "#262730"
+font = "sans serif"
+
+[server]
+# Better for mobile responsiveness
+headless = true
+enableCORS = false
+enableXsrfProtection = true
+
+[browser]
+# Mobile-friendly settings
+gatherUsageStats = false
