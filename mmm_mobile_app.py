@@ -173,7 +173,7 @@ if 'results' in st.session_state:
             true = CONFIG['true_params'][channel]
 
             # Calculate mROI at current spend level
-            avg_spend = df_private[f"{channel}_spend"].mean()
+            avg_spend = df_private[f"spend_{channel}"].mean()
             mroi = calculate_marginal_roi(
                 avg_spend,
                 fitted['adstock_decay'],
@@ -257,7 +257,7 @@ if 'results' in st.session_state:
         true = CONFIG['true_params'][channel]
 
         # Generate spend range
-        max_spend = df_private[f"{channel}_spend"].max() * 1.5
+        max_spend = df_private[f"spend_{channel}"].max() * 1.5
         spend_range = np.linspace(0, max_spend, 100)
 
         # Apply adstock

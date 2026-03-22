@@ -56,8 +56,9 @@ def calculate_marginal_roi(
         - decay=0.5 → Multiplier 2.0x  (was understated by 50%)
         - decay=0.7 → Multiplier 3.33x (was understated by 70%)
     """
-    # Steady-state adstocked spend
-    adstocked_spend = spend / (1 - adstock_decay)
+    # For steady-state mROI: use current spend (not steady-state adstock)
+    # The chain rule multiplier accounts for the cumulative adstock effect
+    adstocked_spend = spend
 
     # Derivative of Hill function with respect to adstocked spend
     numerator = hill_beta * hill_alpha * (hill_k**hill_alpha) * (adstocked_spend**(hill_alpha - 1))

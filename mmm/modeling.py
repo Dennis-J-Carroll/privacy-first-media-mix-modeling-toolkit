@@ -158,8 +158,8 @@ def fit_model(df: pd.DataFrame) -> Dict:
     # Calculate predictions for model evaluation
     predicted_revenue = CONFIG["base_revenue"] + \
                         CONFIG["true_params"]["seasonality_amplitude"] * \
-                        np.sin(2 * np.pi * df['week'] / CONFIG["true_params"]["seasonality_period"])
-    predicted_revenue += df["promotions"] * fitted_params["promo_effect"]
+                        np.sin(2 * np.pi * df['week'].values / CONFIG["true_params"]["seasonality_period"])
+    predicted_revenue += df["promotions"].values * fitted_params["promo_effect"]
 
     for ch in CONFIG["channels"]:
         params = fitted_params[ch]

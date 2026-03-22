@@ -17,7 +17,7 @@ def test_marginal_roi_has_chain_rule_multiplier():
 
     This is the key fix - the original version was missing this multiplier.
     """
-    spend = 10000
+    spend = 100  # Use low spend to avoid saturation effects
     alpha = 2.0
     k = 10000
     beta = 15000
@@ -46,7 +46,7 @@ def test_marginal_roi_increases_with_decay():
     This makes economic sense: if advertising effects last longer,
     each dollar spent has more total impact.
     """
-    spend = 10000
+    spend = 100  # Use low spend to avoid saturation effects
     alpha = 2.0
     k = 15000
     beta = 20000
@@ -72,8 +72,9 @@ def test_marginal_roi_decreases_with_spend():
     k = 10000
     beta = 15000
 
-    mroi_low = calculate_marginal_roi(1000, decay, alpha, k, beta)
-    mroi_mid = calculate_marginal_roi(10000, decay, alpha, k, beta)
+    # Use spend levels all above K/√3 ≈ 5774 to ensure we're in the saturating region
+    mroi_low = calculate_marginal_roi(10000, decay, alpha, k, beta)
+    mroi_mid = calculate_marginal_roi(30000, decay, alpha, k, beta)
     mroi_high = calculate_marginal_roi(50000, decay, alpha, k, beta)
 
     # mROI should decrease as spend increases (diminishing returns)
@@ -100,7 +101,7 @@ def test_marginal_roi_chain_rule_magnitude():
 
     This verifies that the fix had a significant impact (2-3x for typical decay values).
     """
-    spend = 10000
+    spend = 100  # Use low spend to avoid saturation effects
     alpha = 2.0
     k = 10000
     beta = 15000

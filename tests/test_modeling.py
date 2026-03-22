@@ -154,8 +154,8 @@ def test_fit_model_predictions_correct_length():
 
     results = fit_model(df_private)
 
-    assert len(results['predictions']) == 78, \
-        f"Predictions should have length 78, got {len(results['predictions'])}"
+    assert results['predictions'].shape[0] == 78, \
+        f"Predictions should have length 78, got {results['predictions'].shape[0]}"
 
 
 if __name__ == "__main__":
