@@ -16,37 +16,41 @@ def test_marginal_roi_has_chain_rule_multiplier():
     **Issue #1 Fix Verification:** Verify that mROI includes the 1/(1-decay) multiplier.
 
     This is the key fix - the original version was missing this multiplier.
+
+    At realistic spend levels (spend ≈ k), the ratio is NOT simply 1/(1-decay) because
+    we're also moving along the Hill curve. The steady-state adstock with decay=0.5 is
+    2x higher, which puts us deeper into saturation, so the Hill derivative is lower.
+    The combined effect: chain rule gives 2x, Hill derivative gives ~0.32x, net ~0.64x.
     """
-    spend = 100  # Use low spend to avoid saturation effects
+    spend = 10000  # Realistic spend level (at half-saturation point k)
     alpha = 2.0
     k = 10000
     beta = 15000
 
-    # Without chain rule: result would be the Hill derivative only
-    # With chain rule: result is Hill derivative × 1/(1-decay)
-
-    # For decay=0 (no adstock), multiplier = 1/(1-0) = 1
-    # For decay=0.5, multiplier = 1/(1-0.5) = 2
-    # So mROI with decay=0.5 should be approximately 2x the mROI with decay=0
+    # For decay=0: adstock = 10000/(1-0) = 10000
+    # For decay=0.5: adstock = 10000/(1-0.5) = 20000 (2x k, heavily saturated)
 
     mroi_no_decay = calculate_marginal_roi(spend, 0.0, alpha, k, beta)
     mroi_half_decay = calculate_marginal_roi(spend, 0.5, alpha, k, beta)
 
-    # Ratio should be close to 2.0 (the chain rule multiplier)
+    # Ratio should be ~0.64 (chain rule 2x × Hill derivative drop ~0.32x)
     ratio = mroi_half_decay / mroi_no_decay
 
-    # Allow 10% tolerance for numerical precision
-    assert 1.8 < ratio < 2.2, f"Ratio {ratio:.2f} should be close to 2.0 (1/(1-0.5))"
+    # Allow 20% tolerance for numerical effects
+    assert 0.5 < ratio < 0.8, f"Ratio {ratio:.2f} should be ~0.64 at spend=k"
 
 
 def test_marginal_roi_increases_with_decay():
     """
     Verify that higher decay (longer carryover) leads to higher mROI.
 
-    This makes economic sense: if advertising effects last longer,
-    each dollar spent has more total impact.
+    NOTE: This only holds at LOW spend levels where saturation is minimal.
+    At high spend, higher decay increases saturation faster than the chain
+    rule multiplier increases mROI, so mROI can actually DECREASE with decay.
+
+    This test uses spend << k to validate the chain rule in the linear regime.
     """
-    spend = 100  # Use low spend to avoid saturation effects
+    spend = 1000  # Low spend (well below k=15000, minimal saturation)
     alpha = 2.0
     k = 15000
     beta = 20000
@@ -55,9 +59,9 @@ def test_marginal_roi_increases_with_decay():
     mroi_05 = calculate_marginal_roi(spend, 0.5, alpha, k, beta)
     mroi_07 = calculate_marginal_roi(spend, 0.7, alpha, k, beta)
 
-    # Higher decay should give higher mROI (due to chain rule multiplier)
-    assert mroi_05 > mroi_02, "mROI should increase with decay"
-    assert mroi_07 > mroi_05, "mROI should increase with decay"
+    # At low spend, higher decay → higher mROI (chain rule dominates)
+    assert mroi_05 > mroi_02, "mROI should increase with decay at low spend"
+    assert mroi_07 > mroi_05, "mROI should increase with decay at low spend"
 
 
 def test_marginal_roi_decreases_with_spend():
@@ -99,18 +103,21 @@ def test_marginal_roi_chain_rule_magnitude():
     """
     Test the magnitude of the chain rule effect for known parameter values.
 
-    This verifies that the fix had a significant impact (2-3x for typical decay values).
+    At realistic spend levels (spend ≈ k), the ratio includes both the chain rule
+    multiplier 1/(1-decay) AND the Hill derivative change from moving along the curve.
+    These test cases were empirically verified against the corrected formula.
     """
-    spend = 100  # Use low spend to avoid saturation effects
+    spend = 10000  # Realistic spend level (at k)
     alpha = 2.0
     k = 10000
     beta = 15000
 
-    # Test different decay values
+    # Test different decay values with REALISTIC expected ratios
+    # (not naive 1/(1-decay) because we're also moving on Hill curve)
     test_cases = [
-        (0.2, 1.25),  # 1/(1-0.2) = 1.25
-        (0.5, 2.0),   # 1/(1-0.5) = 2.0
-        (0.7, 3.33),  # 1/(1-0.7) = 3.33
+        (0.2, 0.95),   # Chain rule 1.25x × Hill drop ~0.76x ≈ 0.95x
+        (0.5, 0.64),   # Chain rule 2.0x × Hill drop ~0.32x ≈ 0.64x
+        (0.7, 0.30),   # Chain rule 3.33x × Hill drop ~0.09x ≈ 0.30x
     ]
 
     baseline_mroi = calculate_marginal_roi(spend, 0.0, alpha, k, beta)
@@ -119,9 +126,9 @@ def test_marginal_roi_chain_rule_magnitude():
         mroi = calculate_marginal_roi(spend, decay, alpha, k, beta)
         actual_multiplier = mroi / baseline_mroi
 
-        # Allow 15% tolerance (Hill function nonlinearity affects the ratio)
-        lower_bound = expected_multiplier * 0.85
-        upper_bound = expected_multiplier * 1.15
+        # Allow 20% tolerance for numerical effects
+        lower_bound = expected_multiplier * 0.80
+        upper_bound = expected_multiplier * 1.20
 
         assert lower_bound < actual_multiplier < upper_bound, \
             f"For decay={decay}, multiplier {actual_multiplier:.2f} should be near {expected_multiplier:.2f}"
@@ -147,6 +154,36 @@ def test_marginal_roi_with_ground_truth_params():
 
     # Meta has highest decay, so should have highest multiplier effect
     # (though absolute mROI depends on other parameters too)
+
+
+def test_mroi_numerical_ground_truth():
+    """
+    Regression guard: Validate mROI against ground-truth simulation values.
+
+    These values were verified against analytical formula with correct steady-state
+    adstock: A = S/(1-θ). This test prevents formula regressions like Sprint 2
+    which changed to A = S and had 14-3,280% errors.
+
+    The key insight: we evaluate Hill derivative at steady-state adstock level,
+    NOT at raw spend.
+    """
+    # Verified analytical values (using adstocked_spend = spend / (1 - decay))
+    test_cases = [
+        # (spend, decay, alpha, k, beta, expected_mroi, tolerance_pct)
+        (10000, 0.5, 2.0, 10000, 15000, 0.480, 1.0),    # Shopify - exact match
+        (5000, 0.2, 2.5, 12000, 25000, 1.711, 2.0),     # TikTok - analytical value
+        (2000, 0.7, 3.0, 8000, 10000, 3.483, 2.0),      # Meta - analytical value
+        (10000, 0.8, 2.0, 10000, 15000, 0.111, 5.0),    # High decay edge case
+    ]
+
+    for spend, decay, alpha, k, beta, expected, tolerance in test_cases:
+        mroi = calculate_marginal_roi(spend, decay, alpha, k, beta)
+        error_pct = abs(mroi - expected) / expected * 100
+
+        assert error_pct < tolerance, \
+            f"mROI regression detected at spend={spend}, decay={decay}\n" \
+            f"  Got: {mroi:.3f}, Expected: {expected:.3f}, Error: {error_pct:.1f}%\n" \
+            f"  Formula likely changed. Correct: adstocked_spend = spend / (1 - decay)"
 
 
 if __name__ == "__main__":

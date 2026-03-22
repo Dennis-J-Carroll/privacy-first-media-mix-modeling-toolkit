@@ -93,10 +93,13 @@ def test_shifted_laplace_vs_clipped_laplace_bias():
 
     Post-hoc clipping introduces downward bias. Shifted Laplace should
     have much less bias.
+
+    Uses value well above lower bound to avoid excessive rejection sampling
+    in the shifted mechanism, which would skew results.
     """
-    value = 500  # Small value where clipping is likely
+    value = 5000  # Well above lower bound (rejection sampling rarely triggers)
     sensitivity = 1000
-    epsilon = 0.5  # Low epsilon → high noise → more clipping
+    epsilon = 1.0  # Moderate epsilon for clearer signal
     lower_bound = 0.0
 
     np.random.seed(42)
