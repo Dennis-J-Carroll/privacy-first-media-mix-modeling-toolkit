@@ -29,12 +29,13 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from io import BytesIO
 
-# Import core MMM functions
-from advanced_mmm import (
+# Import core MMM functions from new mmm package
+from mmm import (
     generate_weekly_data,
     apply_differential_privacy,
     fit_model,
     CONFIG,
+    CHANNEL_COLORS,
     geometric_adstock,
     hill_function,
     calculate_marginal_roi
