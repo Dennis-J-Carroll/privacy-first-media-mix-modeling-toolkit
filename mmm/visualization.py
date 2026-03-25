@@ -11,11 +11,11 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from .config import CONFIG, OUTPUT_DIR, CHANNEL_COLORS, CONTRIBUTION_COLORS
+from .config import MMMConfig, OUTPUT_DIR, CHANNEL_COLORS, CONTRIBUTION_COLORS
 from .core import geometric_adstock, hill_function
 
 
-def generate_plots(df: pd.DataFrame, fitted_params: Dict) -> None:
+def generate_plots(df: pd.DataFrame, fitted_params: Dict, config: MMMConfig = None) -> None:
     """
     Generates and saves all output charts.
 
@@ -30,11 +30,14 @@ def generate_plots(df: pd.DataFrame, fitted_params: Dict) -> None:
     Args:
         df: DataFrame with marketing data
         fitted_params: Fitted model parameters
+        config: MMMConfig instance. If None, uses default configuration.
     """
+    if config is None:
+        config = MMMConfig()
 
     # --- 1. Response Curves Plot ---
     plt.figure(figsize=(12, 7))
-    for ch in CONFIG["channels"]:
+    for ch in config.channels:
         params = fitted_params[ch]
         spend_range = np.linspace(0, df[f"spend_{ch}"].max() * 1.2, 100)
 
@@ -67,12 +70,12 @@ def generate_plots(df: pd.DataFrame, fitted_params: Dict) -> None:
 
     # --- 2. Predicted vs. Actual Revenue Plot ---
     # Re-calculate predicted revenue using fitted params
-    predicted_revenue = CONFIG["base_revenue"] + \
-                        CONFIG["true_params"]["seasonality_amplitude"] * \
-                        np.sin(2 * np.pi * df['week'] / CONFIG["true_params"]["seasonality_period"])
+    predicted_revenue = config.base_revenue + \
+                        config.true_params.seasonality_amplitude * \
+                        np.sin(2 * np.pi * df['week'] / config.true_params.seasonality_period)
     predicted_revenue += df["promotions"] * fitted_params["promo_effect"]
 
-    for ch in CONFIG["channels"]:
+    for ch in config.channels:
         params = fitted_params[ch]
         adstocked_spend = geometric_adstock(
             df[f"spend_{ch}"].values,
@@ -100,12 +103,12 @@ def generate_plots(df: pd.DataFrame, fitted_params: Dict) -> None:
 
     # --- 3. Contribution Breakdown Plot ---
     contributions = pd.DataFrame(index=df['week'])
-    contributions['Base & Seasonality'] = CONFIG["base_revenue"] + \
-                                          CONFIG["true_params"]["seasonality_amplitude"] * \
-                                          np.sin(2 * np.pi * df['week'] / CONFIG["true_params"]["seasonality_period"])
+    contributions['Base & Seasonality'] = config.base_revenue + \
+                                          config.true_params.seasonality_amplitude * \
+                                          np.sin(2 * np.pi * df['week'] / config.true_params.seasonality_period)
     contributions['Promotions'] = df["promotions"] * fitted_params["promo_effect"]
 
-    for ch in CONFIG["channels"]:
+    for ch in config.channels:
         params = fitted_params[ch]
         adstocked_spend = geometric_adstock(
             df[f"spend_{ch}"].values,

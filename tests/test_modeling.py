@@ -9,7 +9,7 @@ import warnings
 import numpy as np
 import pytest
 
-from mmm import CONFIG, generate_weekly_data, apply_differential_privacy, fit_model
+from mmm import MMMConfig, generate_weekly_data, apply_differential_privacy, fit_model
 
 
 def test_fit_model_returns_convergence_info():
@@ -21,14 +21,13 @@ def test_fit_model_returns_convergence_info():
     """
     # Generate test data with reasonable parameters
     np.random.seed(42)
-    CONFIG["num_weeks"] = 52
-    CONFIG["epsilon"] = 1.0
+    config = MMMConfig(num_weeks=52, epsilon=1.0)
 
-    df = generate_weekly_data()
-    df_private = apply_differential_privacy(df, 1.0)
+    df = generate_weekly_data(config)
+    df_private = apply_differential_privacy(df, 1.0, config)
 
     # Fit model
-    results = fit_model(df_private)
+    results = fit_model(df_private, config)
 
     # Check that convergence info is returned
     assert 'convergence' in results, "Results should include convergence info"
@@ -40,13 +39,12 @@ def test_fit_model_returns_convergence_info():
 def test_fit_model_with_good_data_converges():
     """Verify that model converges with reasonable data."""
     np.random.seed(42)
-    CONFIG["num_weeks"] = 104
-    CONFIG["epsilon"] = 1.0
+    config = MMMConfig(num_weeks=104, epsilon=1.0)
 
-    df = generate_weekly_data()
-    df_private = apply_differential_privacy(df, 1.0)
+    df = generate_weekly_data(config)
+    df_private = apply_differential_privacy(df, 1.0, config)
 
-    results = fit_model(df_private)
+    results = fit_model(df_private, config)
 
     # Should converge successfully
     assert results['convergence']['success'], \
@@ -65,16 +63,15 @@ def test_fit_model_with_high_noise_warns():
     convergence issues or boundary hits.
     """
     np.random.seed(42)
-    CONFIG["num_weeks"] = 52
-    CONFIG["epsilon"] = 0.1  # Very low epsilon → very high noise
+    config = MMMConfig(num_weeks=52, epsilon=0.1)
 
-    df = generate_weekly_data()
-    df_private = apply_differential_privacy(df, 0.1)
+    df = generate_weekly_data(config)
+    df_private = apply_differential_privacy(df, 0.1, config)
 
     # Capture warnings
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter("always")
-        results = fit_model(df_private)
+        results = fit_model(df_private, config)
 
         # Should have warnings (either convergence or boundary)
         # Note: With very high noise, model might not converge or hit bounds
@@ -91,13 +88,12 @@ def test_fit_model_with_high_noise_warns():
 def test_fit_model_returns_metrics():
     """Verify that fit_model returns all expected metrics."""
     np.random.seed(42)
-    CONFIG["num_weeks"] = 52
-    CONFIG["epsilon"] = 1.0
+    config = MMMConfig(num_weeks=52, epsilon=1.0)
 
-    df = generate_weekly_data()
-    df_private = apply_differential_privacy(df, 1.0)
+    df = generate_weekly_data(config)
+    df_private = apply_differential_privacy(df, 1.0, config)
 
-    results = fit_model(df_private)
+    results = fit_model(df_private, config)
 
     # Check all expected keys
     expected_keys = ['fitted_params', 'convergence', 'predictions', 'r_squared', 'mae', 'sse']
@@ -116,13 +112,12 @@ def test_fit_model_returns_metrics():
 def test_fit_model_r_squared_in_valid_range():
     """Verify R² is in valid range [0, 1]."""
     np.random.seed(42)
-    CONFIG["num_weeks"] = 104
-    CONFIG["epsilon"] = 1.0
+    config = MMMConfig(num_weeks=104, epsilon=1.0)
 
-    df = generate_weekly_data()
-    df_private = apply_differential_privacy(df, 1.0)
+    df = generate_weekly_data(config)
+    df_private = apply_differential_privacy(df, 1.0, config)
 
-    results = fit_model(df_private)
+    results = fit_model(df_private, config)
 
     # R² should be between 0 and 1
     assert 0 <= results['r_squared'] <= 1, \
@@ -132,13 +127,12 @@ def test_fit_model_r_squared_in_valid_range():
 def test_fit_model_mae_positive():
     """Verify MAE is positive."""
     np.random.seed(42)
-    CONFIG["num_weeks"] = 52
-    CONFIG["epsilon"] = 1.0
+    config = MMMConfig(num_weeks=52, epsilon=1.0)
 
-    df = generate_weekly_data()
-    df_private = apply_differential_privacy(df, 1.0)
+    df = generate_weekly_data(config)
+    df_private = apply_differential_privacy(df, 1.0, config)
 
-    results = fit_model(df_private)
+    results = fit_model(df_private, config)
 
     assert results['mae'] > 0, "MAE should be positive"
 
@@ -146,13 +140,12 @@ def test_fit_model_mae_positive():
 def test_fit_model_predictions_correct_length():
     """Verify predictions array has correct length."""
     np.random.seed(42)
-    CONFIG["num_weeks"] = 78
-    CONFIG["epsilon"] = 1.0
+    config = MMMConfig(num_weeks=78, epsilon=1.0)
 
-    df = generate_weekly_data()
-    df_private = apply_differential_privacy(df, 1.0)
+    df = generate_weekly_data(config)
+    df_private = apply_differential_privacy(df, 1.0, config)
 
-    results = fit_model(df_private)
+    results = fit_model(df_private, config)
 
     assert results['predictions'].shape[0] == 78, \
         f"Predictions should have length 78, got {results['predictions'].shape[0]}"

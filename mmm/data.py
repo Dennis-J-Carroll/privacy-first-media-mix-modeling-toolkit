@@ -8,11 +8,11 @@ parameters for testing and demonstration purposes.
 import numpy as np
 import pandas as pd
 
-from .config import CONFIG
+from .config import MMMConfig
 from .core import geometric_adstock, hill_function
 
 
-def generate_weekly_data() -> pd.DataFrame:
+def generate_weekly_data(config: MMMConfig = None) -> pd.DataFrame:
     """
     Generates synthetic weekly marketing data based on defined "true" parameters.
 
@@ -23,6 +23,9 @@ def generate_weekly_data() -> pd.DataFrame:
     - Promotions and seasonality
     - Random noise
 
+    Args:
+        config: MMMConfig instance. If None, uses default configuration.
+
     Returns:
         DataFrame with columns:
         - week: Week number
@@ -32,44 +35,47 @@ def generate_weekly_data() -> pd.DataFrame:
         - promotions: Binary promotion indicator
 
     Ground Truth:
-        Uses parameters from CONFIG["true_params"] to generate data
+        Uses parameters from config.true_params to generate data
         with known relationships, enabling validation of model estimates.
     """
-    weeks = np.arange(1, CONFIG["num_weeks"] + 1)
+    if config is None:
+        config = MMMConfig()
+
+    weeks = np.arange(1, config.num_weeks + 1)
     df = pd.DataFrame({'week': weeks})
 
     # 1. Generate Spend & Control Variables
-    for ch in CONFIG["channels"]:
+    for ch in config.channels:
         # Realistic spend range: $2k-$20k per week
-        df[f"spend_{ch}"] = np.random.uniform(2000, 20000, CONFIG["num_weeks"])
+        df[f"spend_{ch}"] = np.random.uniform(2000, 20000, config.num_weeks)
 
     # Promotions occur ~15% of weeks
-    df["promotions"] = (np.random.rand(CONFIG["num_weeks"]) < 0.15).astype(int)
+    df["promotions"] = (np.random.rand(config.num_weeks) < 0.15).astype(int)
 
     # Yearly seasonality cycle
-    seasonality = CONFIG["true_params"]["seasonality_amplitude"] * \
-                  np.sin(2 * np.pi * weeks / CONFIG["true_params"]["seasonality_period"])
+    seasonality = config.true_params.seasonality_amplitude * \
+                  np.sin(2 * np.pi * weeks / config.true_params.seasonality_period)
 
     # 2. Calculate "True" Revenue using MMM principles
-    total_revenue = CONFIG["base_revenue"] + seasonality
-    total_revenue += df["promotions"] * CONFIG["true_params"]["promo_effect"]
+    total_revenue = config.base_revenue + seasonality
+    total_revenue += df["promotions"] * config.true_params.promo_effect
 
     # Add channel contributions with adstock and saturation
-    for ch in CONFIG["channels"]:
-        params = CONFIG["true_params"][ch]
+    for ch in config.channels:
+        params = getattr(config.true_params, ch)
 
         # Apply adstock transformation
         adstocked_spend = geometric_adstock(
             df[f"spend_{ch}"].values,
-            params["adstock_decay"]
+            params.adstock_decay
         )
 
         # Apply saturation (Hill function)
         channel_contribution = hill_function(
             adstocked_spend,
-            params["hill_alpha"],
-            params["hill_K"],
-            params["hill_beta"]
+            params.hill_alpha,
+            params.hill_K,
+            params.hill_beta
         )
 
         # Store contribution for later comparison
@@ -79,8 +85,8 @@ def generate_weekly_data() -> pd.DataFrame:
     # 3. Add random noise to simulate natural variation
     df["revenue"] = total_revenue + np.random.normal(
         0,
-        CONFIG["noise_std"],
-        CONFIG["num_weeks"]
+        config.noise_std,
+        config.num_weeks
     )
 
     # Ensure non-negative revenue

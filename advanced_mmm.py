@@ -67,7 +67,7 @@ import pandas as pd
 
 # Import from new mmm package
 from mmm import (
-    CONFIG,
+    MMMConfig,
     OUTPUT_DIR,
     generate_weekly_data,
     apply_differential_privacy,
@@ -76,9 +76,12 @@ from mmm import (
     generate_plots
 )
 
+# Create default configuration
+config = MMMConfig()
+
 # Set random seeds for reproducibility
-random.seed(CONFIG["random_seed"])
-np.random.seed(CONFIG["random_seed"])
+random.seed(config.random_seed)
+np.random.seed(config.random_seed)
 
 
 def main():
@@ -88,13 +91,13 @@ def main():
     print("=" * 70)
 
     print("\n1. Generating synthetic data with known ground truth...")
-    df_original = generate_weekly_data()
+    df_original = generate_weekly_data(config)
 
     print("\n2. Applying privacy-preserving mechanisms...")
-    df = apply_differential_privacy(df_original, CONFIG["epsilon"])
+    df = apply_differential_privacy(df_original, config.epsilon, config)
 
     print("\n3. Fitting the advanced MMM to the privatized data...")
-    results = fit_model(df)
+    results = fit_model(df, config)
     fitted_params = results['fitted_params']
 
     print(f"\n   Convergence: {'✓ Success' if results['convergence']['success'] else '✗ Failed'}")
@@ -103,8 +106,8 @@ def main():
 
     print("\n4. Analyzing results and calculating mROI...")
     summary_data = []
-    for ch in CONFIG["channels"]:
-        true = CONFIG["true_params"][ch]
+    for ch in config.channels:
+        true = getattr(config.true_params, ch)
         fitted = fitted_params[ch]
         avg_spend = df[f"spend_{ch}"].mean()
 
@@ -117,25 +120,25 @@ def main():
         summary_data.append({
             "channel": ch,
             "parameter": "adstock_decay",
-            "true_value": true["adstock_decay"],
+            "true_value": true.adstock_decay,
             "fitted_value": fitted["adstock_decay"]
         })
         summary_data.append({
             "channel": ch,
             "parameter": "hill_alpha (shape)",
-            "true_value": true["hill_alpha"],
+            "true_value": true.hill_alpha,
             "fitted_value": fitted["hill_alpha"]
         })
         summary_data.append({
             "channel": ch,
             "parameter": "hill_K (saturation_point)",
-            "true_value": true["hill_K"],
+            "true_value": true.hill_K,
             "fitted_value": fitted["hill_K"]
         })
         summary_data.append({
             "channel": ch,
             "parameter": "hill_beta (max_effect)",
-            "true_value": true["hill_beta"],
+            "true_value": true.hill_beta,
             "fitted_value": fitted["hill_beta"]
         })
         summary_data.append({
@@ -152,13 +155,13 @@ def main():
     print(summary_df)
 
     print("\n5. Generating visualizations...")
-    generate_plots(df, fitted_params)
+    generate_plots(df, fitted_params, config)
 
     print("\n" + "=" * 70)
     print("PRIVACY-FIRST MMM ANALYSIS COMPLETE")
     print("=" * 70)
     # **Issue #3 Fix:** Removed delta (not used in Laplace mechanism)
-    print(f"\nPrivacy Guarantee: ε={CONFIG['epsilon']:.2f}-differential privacy (Laplace mechanism)")
+    print(f"\nPrivacy Guarantee: ε={config.epsilon:.2f}-differential privacy (Laplace mechanism)")
     print(f"All outputs saved to: {OUTPUT_DIR}/")
     print("\nThis analysis demonstrates responsible AI development by:")
     print("  • Using only aggregated data (privacy by design)")

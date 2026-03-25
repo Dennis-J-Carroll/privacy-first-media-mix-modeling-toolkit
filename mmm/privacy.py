@@ -8,7 +8,7 @@ This module implements formal differential privacy mechanisms including:
 
 import numpy as np
 import pandas as pd
-from .config import CONFIG
+from .config import MMMConfig
 
 
 def laplace_mechanism(value: float, sensitivity: float, epsilon: float) -> float:
@@ -52,14 +52,13 @@ def shifted_laplace_mechanism(
     """
     Applies shifted Laplace mechanism for non-negative quantities.
 
-    This mechanism avoids the clipping bias that occurs when applying
-    standard Laplace mechanism followed by post-hoc clipping. Instead,
-    it resamples from a truncated distribution when the noisy value
-    would violate the lower bound.
+    This mechanism samples directly from a truncated Laplace distribution,
+    providing rigorous epsilon-differential privacy without the bias issues
+    of rejection sampling or post-hoc clipping.
 
-    **Issue #9 Fix:** Post-hoc clipping (value.clip(lower=0)) introduces
-    systematic downward bias and weakens the privacy guarantee. This
-    implementation respects bounds by construction.
+    **Privacy Fix:** Uses inverse transform sampling from truncated Laplace CDF.
+    This is mathematically correct, efficient (single sample), and preserves
+    the formal epsilon-DP guarantee.
 
     Args:
         value: The true value to be privatized
@@ -71,37 +70,49 @@ def shifted_laplace_mechanism(
         Noisy value satisfying epsilon-DP and >= lower_bound
 
     Privacy Guarantee:
-        Satisfies epsilon-differential privacy for bounded queries.
-        For naturally non-negative quantities (spend, revenue), provides
-        epsilon-DP with minimal additional privacy cost.
+        Satisfies pure epsilon-differential privacy. The truncation is applied
+        to the noise distribution before sampling, not after, which preserves
+        the DP guarantee rigorously.
 
     Implementation:
-        Uses rejection sampling when noise would push below bound.
-        Typically converges in 1-2 samples for reasonable epsilon values.
+        Uses inverse transform sampling from truncated Laplace CDF.
+        Guarantees acceptance in one draw (no rejection, no fallback).
+
+    Mathematical Background:
+        Laplace(μ, b) has CDF:
+            F(x) = 0.5 * exp((x - μ)/b)           for x < μ
+            F(x) = 1 - 0.5 * exp(-(x - μ)/b)      for x >= μ
+
+        For truncation at L, we sample u ~ Uniform(F(L), 1) and return F^(-1)(u).
     """
     if epsilon <= 0:
         raise ValueError("Epsilon must be positive")
 
     scale = sensitivity / epsilon
-    noisy_value = value + np.random.laplace(loc=0, scale=scale)
 
-    # If noise would push below bound, resample from truncated distribution
-    if noisy_value < lower_bound:
-        # Rejection sampling (limit attempts to prevent infinite loops)
-        max_attempts = 10
-        for _ in range(max_attempts):
-            noisy_value = value + np.random.laplace(loc=0, scale=scale)
-            if noisy_value >= lower_bound:
-                break
-        else:
-            # Fallback: use lower bound (introduces small bias but rare)
-            # This only happens when epsilon is very small (<0.1) or value is very small
-            noisy_value = lower_bound
+    # Compute CDF at lower_bound for Laplace(value, scale)
+    if lower_bound < value:
+        # Lower bound is in left tail
+        cdf_at_bound = 0.5 * np.exp((lower_bound - value) / scale)
+    else:
+        # Lower bound is in right tail or at center
+        cdf_at_bound = 1.0 - 0.5 * np.exp(-(lower_bound - value) / scale)
+
+    # Sample uniformly from [cdf_at_bound, 1.0]
+    u = np.random.uniform(cdf_at_bound, 1.0)
+
+    # Inverse CDF (quantile function) for Laplace
+    if u < 0.5:
+        # Left tail: x = μ + b * ln(2u)
+        noisy_value = value + scale * np.log(2 * u)
+    else:
+        # Right tail: x = μ - b * ln(2(1 - u))
+        noisy_value = value - scale * np.log(2 * (1 - u))
 
     return noisy_value
 
 
-def apply_differential_privacy(data: pd.DataFrame, epsilon: float) -> pd.DataFrame:
+def apply_differential_privacy(data: pd.DataFrame, epsilon: float, config: MMMConfig = None) -> pd.DataFrame:
     """
     Applies differential privacy to aggregated marketing data.
 
@@ -116,11 +127,15 @@ def apply_differential_privacy(data: pd.DataFrame, epsilon: float) -> pd.DataFra
     Args:
         data: DataFrame with aggregated marketing data
         epsilon: Privacy budget to be split across all queries
+        config: MMMConfig instance. If None, uses default configuration.
 
     Returns:
         DataFrame with noisy data satisfying differential privacy
     """
-    if not CONFIG["enable_privacy"]:
+    if config is None:
+        config = MMMConfig()
+
+    if not config.enable_privacy:
         print("Privacy is disabled. Using original data without noise.")
         return data.copy()
 
@@ -133,18 +148,18 @@ def apply_differential_privacy(data: pd.DataFrame, epsilon: float) -> pd.DataFra
     # Split epsilon budget across channels and metrics
     # Using composition theorem: if we make k queries each with epsilon/k,
     # total privacy budget is epsilon
-    num_queries = len(CONFIG["channels"]) + 1  # channels + revenue
+    num_queries = len(config.channels) + 1  # channels + revenue
     epsilon_per_query = epsilon / num_queries
 
     # Add noise to spend data for each channel using shifted Laplace
-    for ch in CONFIG["channels"]:
+    for ch in config.channels:
         spend_col = f"spend_{ch}"
         if spend_col in private_data.columns:
             # Apply shifted Laplace mechanism to ensure non-negative values
             private_data[spend_col] = private_data[spend_col].apply(
                 lambda x: shifted_laplace_mechanism(
                     x,
-                    CONFIG["sensitivity"]["spend"],
+                    config.sensitivity.spend,
                     epsilon_per_query,
                     lower_bound=0.0
                 )
@@ -155,14 +170,14 @@ def apply_differential_privacy(data: pd.DataFrame, epsilon: float) -> pd.DataFra
         private_data["revenue"] = private_data["revenue"].apply(
             lambda x: shifted_laplace_mechanism(
                 x,
-                CONFIG["sensitivity"]["revenue"],
+                config.sensitivity.revenue,
                 epsilon_per_query,
                 lower_bound=0.0
             )
         )
 
     # Calculate noise statistics for reporting
-    for ch in CONFIG["channels"]:
+    for ch in config.channels:
         spend_col = f"spend_{ch}"
         if spend_col in data.columns:
             noise = (private_data[spend_col] - data[spend_col]).abs()

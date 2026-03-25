@@ -32,7 +32,16 @@ __version__ = "2.0.0"
 __author__ = "Privacy-First MMM Contributors"
 
 # Configuration
-from .config import CONFIG, OUTPUT_DIR, CHANNEL_COLORS, CONTRIBUTION_COLORS
+from .config import (
+    CONFIG,
+    OUTPUT_DIR,
+    CHANNEL_COLORS,
+    CONTRIBUTION_COLORS,
+    MMMConfig,
+    SensitivityConfig,
+    ChannelParams,
+    TrueParams
+)
 
 # Core mathematical functions
 from .core import geometric_adstock, hill_function
@@ -65,6 +74,10 @@ from .visualization import generate_plots
 __all__ = [
     # Configuration
     "CONFIG",
+    "MMMConfig",
+    "SensitivityConfig",
+    "ChannelParams",
+    "TrueParams",
     "OUTPUT_DIR",
     "CHANNEL_COLORS",
     "CONTRIBUTION_COLORS",

@@ -12,11 +12,11 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
 
-from .config import CONFIG
+from .config import MMMConfig
 from .core import geometric_adstock, hill_function
 
 
-def objective_function(params: np.ndarray, df: pd.DataFrame) -> float:
+def objective_function(params: np.ndarray, df: pd.DataFrame, config: MMMConfig) -> float:
     """
     Objective function to minimize: Sum of Squared Errors (SSE).
 
@@ -28,11 +28,12 @@ def objective_function(params: np.ndarray, df: pd.DataFrame) -> float:
             - 4 parameters per channel (adstock_decay, hill_alpha, hill_K, hill_beta)
             - 1 promotion effect parameter
         df: DataFrame with spend and revenue data
+        config: MMMConfig instance
 
     Returns:
         Sum of squared errors (lower is better)
     """
-    num_channels = len(CONFIG["channels"])
+    num_channels = len(config.channels)
 
     # Unpack parameters
     # 4 params per channel (adstock_decay, hill_alpha, hill_K, hill_beta)
@@ -41,14 +42,14 @@ def objective_function(params: np.ndarray, df: pd.DataFrame) -> float:
     promo_effect = params[num_channels * 4]
 
     # Base revenue + seasonality (using known ground truth for simplicity)
-    predicted_revenue = CONFIG["base_revenue"] + \
-                        CONFIG["true_params"]["seasonality_amplitude"] * \
-                        np.sin(2 * np.pi * df['week'] / CONFIG["true_params"]["seasonality_period"])
+    predicted_revenue = config.base_revenue + \
+                        config.true_params.seasonality_amplitude * \
+                        np.sin(2 * np.pi * df['week'] / config.true_params.seasonality_period)
 
     predicted_revenue += df["promotions"] * promo_effect
 
     # Add channel contributions
-    for i, ch in enumerate(CONFIG["channels"]):
+    for i, ch in enumerate(config.channels):
         adstock_decay, hill_alpha, hill_k, hill_beta = channel_params[i]
         adstocked_spend = geometric_adstock(df[f"spend_{ch}"].values, adstock_decay)
         predicted_revenue += hill_function(adstocked_spend, hill_alpha, hill_k, hill_beta)
@@ -58,7 +59,7 @@ def objective_function(params: np.ndarray, df: pd.DataFrame) -> float:
     return error
 
 
-def fit_model(df: pd.DataFrame) -> Dict:
+def fit_model(df: pd.DataFrame, config: MMMConfig = None) -> Dict:
     """
     Fits the non-linear MMM using scipy.optimize.minimize.
 
@@ -66,6 +67,7 @@ def fit_model(df: pd.DataFrame) -> Dict:
 
     Args:
         df: DataFrame with marketing data
+        config: MMMConfig instance. If None, uses default configuration.
 
     Returns:
         Dictionary with:
@@ -76,12 +78,15 @@ def fit_model(df: pd.DataFrame) -> Dict:
         - mae: Mean absolute error
         - sse: Sum of squared errors
     """
-    num_channels = len(CONFIG["channels"])
+    if config is None:
+        config = MMMConfig()
+
+    num_channels = len(config.channels)
 
     # Define bounds to guide optimizer to plausible values
     # (decay, alpha, K, beta) per channel + promo_effect
     bounds = []
-    for _ in CONFIG["channels"]:
+    for _ in config.channels:
         bounds.extend([
             (0.0, 0.9),      # adstock_decay
             (1.0, 5.0),      # hill_alpha
@@ -97,7 +102,7 @@ def fit_model(df: pd.DataFrame) -> Dict:
     result = minimize(
         objective_function,
         initial_guesses,
-        args=(df,),
+        args=(df, config),
         bounds=bounds,
         method='L-BFGS-B',
         options={'maxiter': 1000, 'ftol': 1e-6}
@@ -126,7 +131,7 @@ def fit_model(df: pd.DataFrame) -> Dict:
     # Check for boundary hits
     fitted_params_list = result.x
     param_names = []
-    for ch in CONFIG["channels"]:
+    for ch in config.channels:
         param_names.extend([
             f"{ch}_adstock_decay",
             f"{ch}_hill_alpha",
@@ -145,7 +150,7 @@ def fit_model(df: pd.DataFrame) -> Dict:
 
     # Unpack fitted parameters into structured dictionary
     fitted_params = {}
-    for i, ch in enumerate(CONFIG["channels"]):
+    for i, ch in enumerate(config.channels):
         param_idx = i * 4
         fitted_params[ch] = {
             "adstock_decay": fitted_params_list[param_idx],
@@ -156,12 +161,12 @@ def fit_model(df: pd.DataFrame) -> Dict:
     fitted_params["promo_effect"] = fitted_params_list[num_channels * 4]
 
     # Calculate predictions for model evaluation
-    predicted_revenue = CONFIG["base_revenue"] + \
-                        CONFIG["true_params"]["seasonality_amplitude"] * \
-                        np.sin(2 * np.pi * df['week'].values / CONFIG["true_params"]["seasonality_period"])
+    predicted_revenue = config.base_revenue + \
+                        config.true_params.seasonality_amplitude * \
+                        np.sin(2 * np.pi * df['week'].values / config.true_params.seasonality_period)
     predicted_revenue += df["promotions"].values * fitted_params["promo_effect"]
 
-    for ch in CONFIG["channels"]:
+    for ch in config.channels:
         params = fitted_params[ch]
         adstocked_spend = geometric_adstock(
             df[f"spend_{ch}"].values,

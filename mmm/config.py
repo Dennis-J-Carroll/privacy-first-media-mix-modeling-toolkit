@@ -6,12 +6,80 @@ and constants used throughout the MMM toolkit.
 """
 
 import os
+from dataclasses import dataclass, field
+from typing import Dict, List, Tuple
 
 # Output directory for results
 OUTPUT_DIR = "mmm_output_advanced"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# Main configuration dictionary
+
+@dataclass(frozen=True)
+class SensitivityConfig:
+    """Sensitivity values for differential privacy."""
+    spend: int = 1000
+    revenue: int = 500
+    promotions: int = 1
+
+
+@dataclass(frozen=True)
+class ChannelParams:
+    """Parameters for a single marketing channel."""
+    adstock_decay: float
+    hill_alpha: float
+    hill_K: float
+    hill_beta: float
+
+
+@dataclass(frozen=True)
+class TrueParams:
+    """Ground truth parameters for data simulation."""
+    Shopify: ChannelParams
+    TikTok: ChannelParams
+    Meta: ChannelParams
+    promo_effect: float
+    seasonality_amplitude: float
+    seasonality_period: int
+
+
+@dataclass(frozen=True)
+class MMMConfig:
+    """
+    Immutable configuration for Media Mix Modeling.
+
+    This frozen dataclass replaces the mutable CONFIG dictionary,
+    preventing order-dependent bugs and improving test isolation.
+
+    Usage:
+        # Create config
+        config = MMMConfig()
+
+        # Create modified config
+        config2 = MMMConfig(num_weeks=52, epsilon=0.5)
+
+        # Use in functions
+        data = generate_weekly_data(config)
+        results = fit_model(data, config)
+    """
+    num_weeks: int = 104
+    channels: Tuple[str, ...] = ("Shopify", "TikTok", "Meta")
+    base_revenue: int = 5000
+    noise_std: int = 1000
+    random_seed: int = 42
+    enable_privacy: bool = True
+    epsilon: float = 1.0
+    sensitivity: SensitivityConfig = field(default_factory=SensitivityConfig)
+    true_params: TrueParams = field(default_factory=lambda: TrueParams(
+        Shopify=ChannelParams(adstock_decay=0.5, hill_alpha=2.0, hill_K=10000, hill_beta=15000),
+        TikTok=ChannelParams(adstock_decay=0.2, hill_alpha=2.5, hill_K=12000, hill_beta=25000),
+        Meta=ChannelParams(adstock_decay=0.7, hill_alpha=3.0, hill_K=8000, hill_beta=10000),
+        promo_effect=8000,
+        seasonality_amplitude=4000,
+        seasonality_period=52
+    ))
+
+
+# Main configuration dictionary (DEPRECATED - use MMMConfig dataclass)
 CONFIG = {
     "num_weeks": 104,  # 2 years of data for better model stability
     "channels": ["Shopify", "TikTok", "Meta"],
