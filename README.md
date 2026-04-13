@@ -176,6 +176,12 @@ The toolkit includes visualization tools to help understand the privacy-utility 
 - `effort_mix_modeling.md` - Additional MMM guidelines and methodology
 - `mmm_output_advanced/` - Output directory for analysis results
 
+**Interactive Privacy Tuning Tools:**
+- `examples/privacy_parameter_sweep.py` - Systematic epsilon comparison script
+- `examples/interactive_privacy_tuning.ipynb` - Jupyter notebook with interactive widgets
+- `docs/privacy_parameter_guide.md` - Comprehensive epsilon selection guide
+- `mmm_privacy_comparisons/` - Output directory for epsilon comparison results (generated)
+
 **Note:** This repository also contains some customer churn analysis scripts (`PRO_*.py`, `analysis_summary.py`, `telco.csv`) from a separate analytics project. These are not part of the privacy-first MMM toolkit and can be ignored or removed for production use.
 
 ## Getting Started
@@ -236,6 +242,122 @@ To use your own marketing data:
 
 3. Adjust sensitivity parameters in CONFIG based on your data characteristics
 
+## Interactive Privacy Parameter Tuning
+
+This toolkit includes interactive tools for exploring the privacy-utility tradeoff and selecting an appropriate epsilon value for your use case.
+
+### Quick Start: Parameter Sweep
+
+Run a systematic comparison of multiple epsilon values to visualize the privacy-utility tradeoff:
+
+```bash
+python examples/privacy_parameter_sweep.py
+```
+
+This generates:
+- **`privacy_utility_tradeoff.png`**: The main visualization showing how epsilon affects model accuracy
+- **`parameter_accuracy_comparison.png`**: Heatmap showing parameter recovery across epsilon values
+- **`noise_impact_by_epsilon.png`**: Analysis of noise distribution by epsilon
+- **`epsilon_comparison_summary.csv`**: Tabular comparison of all tested values
+
+The parameter sweep tests epsilon values [0.1, 0.5, 1.0, 2.0, 5.0, 10.0] and helps you understand:
+- How much noise is added at each privacy level
+- Impact on model fit quality (R²) and prediction error (MAE)
+- Parameter accuracy compared to ground truth
+- Recommended epsilon ranges for your needs
+
+### Interactive Exploration
+
+For hands-on learning with real-time parameter adjustment, use the Jupyter notebook:
+
+```bash
+jupyter notebook examples/interactive_privacy_tuning.ipynb
+```
+
+**Features:**
+- **Interactive sliders** to adjust epsilon and see immediate impacts
+- **Noise visualization** showing how privacy affects data quality
+- **Side-by-side model comparison** for two different epsilon values
+- **Guided exercises** to build intuition about the privacy-utility tradeoff
+- **Best practices summary** with decision frameworks
+
+**Recommended learning path:**
+1. Start with the parameter sweep to see the full landscape
+2. Explore the interactive notebook to develop hands-on intuition
+
+### 📱 Mobile Web App
+
+For the best mobile experience, we provide a **Streamlit-based web app** that works perfectly on phones and tablets:
+
+```bash
+streamlit run mmm_mobile_app.py
+```
+
+**Features:**
+- **Touch-optimized interface** with mobile-friendly sliders and buttons
+- **Real-time privacy exploration** - adjust epsilon and see instant results
+- **Responsive visualizations** that adapt to any screen size
+- **Works on all devices** - iOS, Android, tablets, and desktops
+- **No installation needed** for end users (when deployed to cloud)
+
+**Deploy to Streamlit Cloud (FREE):**
+
+1. Push your repo to GitHub
+2. Go to [streamlit.io/cloud](https://share.streamlit.io)
+3. Connect your repo and deploy
+4. Share the URL - works on any phone!
+
+See **[MOBILE_DEPLOYMENT_GUIDE.md](MOBILE_DEPLOYMENT_GUIDE.md)** for detailed instructions, including:
+- Local testing on your phone
+- Step-by-step cloud deployment
+- Mobile optimization tips
+- Troubleshooting guide
+
+**Perfect for:**
+- Testing on mobile devices during development
+- Sharing with non-technical stakeholders
+- Educational demonstrations
+- Remote collaboration
+3. Read the decision guide (below) for structured selection framework
+4. Document your chosen epsilon with clear justification
+
+### Decision Guide
+
+For comprehensive guidance on selecting epsilon values, see:
+
+```
+docs/privacy_parameter_guide.md
+```
+
+This guide includes:
+- **Decision trees** based on data type, regulations, and dataset size
+- **Case studies** with real-world epsilon selections and rationales
+- **Reference tables** mapping epsilon ranges to use cases and privacy levels
+- **Validation procedures** for testing epsilon choices
+- **Documentation templates** for regulatory compliance
+
+### Choosing Your Epsilon Value
+
+The privacy parameter (epsilon) controls the privacy-utility tradeoff:
+- **Lower epsilon** = More privacy, more noise, less accuracy
+- **Higher epsilon** = Less privacy, less noise, more accuracy
+
+**General Guidelines:**
+
+| Epsilon Range | Privacy Level | Typical Use Cases |
+|---------------|---------------|-------------------|
+| ε ≤ 1.0 | High Privacy | Sensitive health/financial data, GDPR compliance |
+| ε = 1.0-3.0 | Moderate Privacy | **Recommended for most marketing MMM applications** |
+| ε ≥ 5.0 | Low Privacy | Less sensitive aggregated data, focus on utility |
+
+**For most marketing analytics, we recommend starting with ε = 1.0-3.0** and adjusting based on:
+- Your specific privacy requirements and regulations
+- Dataset size and characteristics
+- Acceptable accuracy thresholds
+- Results from the parameter sweep tool
+
+Always document your epsilon choice with clear justification for transparency and compliance.
+
 ## Business Impact
 
 By modeling marketing spend at an aggregated level and applying privacy-preserving techniques, this toolkit allows companies to:
@@ -257,12 +379,41 @@ When making multiple queries on the same dataset, privacy budgets compose:
 - The toolkit implements this by splitting ε across channels and metrics
 - Be mindful of privacy budget depletion when running multiple analyses
 
+### Privacy Parameter Tuning and Selection
+
+The toolkit provides comprehensive tools for selecting appropriate epsilon values:
+
+**Systematic Testing:**
+- Use `examples/privacy_parameter_sweep.py` to compare multiple epsilon values systematically
+- Generates comparison visualizations and CSV export of metrics across epsilon values
+- Helps identify the lowest epsilon (highest privacy) that meets your accuracy requirements
+
+**Interactive Exploration:**
+- The Jupyter notebook `examples/interactive_privacy_tuning.ipynb` provides hands-on exploration
+- Adjust epsilon with sliders and see real-time impacts on noise and model quality
+- Compare two epsilon values side-by-side to understand tradeoffs
+
+**Decision Framework:**
+- See `docs/privacy_parameter_guide.md` for comprehensive selection guidance
+- Includes decision trees based on data sensitivity, regulations, and dataset characteristics
+- Case studies showing real-world epsilon selections with documented rationales
+- Documentation templates for regulatory compliance and audit trails
+
+**Key Considerations:**
+1. **Data Sensitivity**: Health/financial data requires ε ≤ 1.0; marketing aggregates can use ε = 1.0-5.0
+2. **Regulatory Requirements**: GDPR typically requires ε ≤ 1.0; CCPA allows ε ≤ 3.0
+3. **Dataset Size**: Larger datasets can tolerate lower epsilon; smaller datasets may need higher epsilon
+4. **Utility Requirements**: High-stakes decisions may require higher epsilon for accuracy
+
+**Best Practice**: Always test multiple epsilon values, document your selection rationale, and obtain privacy officer approval before production deployment.
+
 ### Extending the Toolkit
 
 The modular design allows for:
 - **Custom privacy mechanisms**: Implement Gaussian mechanism or advanced variants
 - **Alternative models**: Plug in different statistical models (e.g., time-series models)
 - **Additional PETs**: Combine with techniques like federated learning or secure aggregation
+- **Enhanced visualizations**: Add custom plots for privacy-utility analysis
 
 ## Contributing
 

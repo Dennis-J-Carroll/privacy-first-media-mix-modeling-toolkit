@@ -1,8 +1,14 @@
-numpy
-pandas
-matplotlib
-seaborn
-scipy
-scikit-learn
-imbalanced-learn
-xgboost
+# Core dependencies - pinned for reproducibility
+numpy==2.4.3
+pandas==2.3.3
+scipy==1.17.1
+matplotlib==3.10.8
+
+# Privacy
+opendp>=0.7.0
+
+# Visualization
+streamlit==1.55.0
+
+# Testing
+pytest==9.0.2
