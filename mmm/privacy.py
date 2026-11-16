@@ -3,7 +3,7 @@ Privacy-preserving mechanisms for differential privacy.
 
 This module implements formal differential privacy mechanisms including:
 - Laplace mechanism for epsilon-DP
-- Shifted Laplace mechanism (bias-corrected for non-negative quantities)
+- Clamped Laplace mechanism (for quantities with a lower bound, e.g. spend)
 """
 
 import numpy as np
@@ -43,22 +43,19 @@ def laplace_mechanism(value: float, sensitivity: float, epsilon: float) -> float
     return value + noise
 
 
-def shifted_laplace_mechanism(
+def clamped_laplace_mechanism(
     value: float,
     sensitivity: float,
     epsilon: float,
     lower_bound: float = 0.0
 ) -> float:
     """
-    Applies shifted Laplace mechanism for non-negative quantities.
+    Laplace mechanism followed by a clamp at ``lower_bound``.
 
-    This mechanism samples directly from a truncated Laplace distribution,
-    providing rigorous epsilon-differential privacy without the bias issues
-    of rejection sampling or post-hoc clipping.
-
-    **Privacy Fix:** Uses inverse transform sampling from truncated Laplace CDF.
-    This is mathematically correct, efficient (single sample), and preserves
-    the formal epsilon-DP guarantee.
+    Draws standard Laplace noise and then raises any result below
+    ``lower_bound`` up to it. The clamp is a fixed function of the noisy
+    output that never looks at the true value, so it is post-processing and
+    the result keeps the epsilon-DP guarantee of the Laplace mechanism.
 
     Args:
         value: The true value to be privatized
@@ -69,47 +66,28 @@ def shifted_laplace_mechanism(
     Returns:
         Noisy value satisfying epsilon-DP and >= lower_bound
 
-    Privacy Guarantee:
-        Satisfies pure epsilon-differential privacy. The truncation is applied
-        to the noise distribution before sampling, not after, which preserves
-        the DP guarantee rigorously.
+    Bias:
+        Clamping is NOT unbiased. Mass that would fall below the bound is
+        moved onto it, so the expected output exceeds the true value by
+        (scale / 2) * exp(-(value - lower_bound) / scale) for value >=
+        lower_bound, where scale = sensitivity / epsilon. This is negligible
+        when the value is several scales above the bound and substantial
+        when it is within about one scale of it.
 
-    Implementation:
-        Uses inverse transform sampling from truncated Laplace CDF.
-        Guarantees acceptance in one draw (no rejection, no fallback).
-
-    Mathematical Background:
-        Laplace(μ, b) has CDF:
-            F(x) = 0.5 * exp((x - μ)/b)           for x < μ
-            F(x) = 1 - 0.5 * exp(-(x - μ)/b)      for x >= μ
-
-        For truncation at L, we sample u ~ Uniform(F(L), 1) and return F^(-1)(u).
+    Why not sample a truncated Laplace instead:
+        Conditioning the noise on landing above the bound renormalises the
+        density by a constant that depends on the true value. That constant
+        differs between neighbouring datasets, so the privacy loss can exceed
+        epsilon (up to ln(2*e^eps - 1) at the bound: 1.49 for eps = 1). It is
+        also more biased than clamping. An earlier version of this module did
+        this and claimed pure epsilon-DP; that claim was wrong.
     """
-    if epsilon <= 0:
-        raise ValueError("Epsilon must be positive")
+    return max(laplace_mechanism(value, sensitivity, epsilon), lower_bound)
 
-    scale = sensitivity / epsilon
 
-    # Compute CDF at lower_bound for Laplace(value, scale)
-    if lower_bound < value:
-        # Lower bound is in left tail
-        cdf_at_bound = 0.5 * np.exp((lower_bound - value) / scale)
-    else:
-        # Lower bound is in right tail or at center
-        cdf_at_bound = 1.0 - 0.5 * np.exp(-(lower_bound - value) / scale)
-
-    # Sample uniformly from [cdf_at_bound, 1.0]
-    u = np.random.uniform(cdf_at_bound, 1.0)
-
-    # Inverse CDF (quantile function) for Laplace
-    if u < 0.5:
-        # Left tail: x = μ + b * ln(2u)
-        noisy_value = value + scale * np.log(2 * u)
-    else:
-        # Right tail: x = μ - b * ln(2(1 - u))
-        noisy_value = value - scale * np.log(2 * (1 - u))
-
-    return noisy_value
+# Deprecated name, kept so existing imports keep working. It used to sample a
+# truncated Laplace, which did not satisfy epsilon-DP (see above).
+shifted_laplace_mechanism = clamped_laplace_mechanism
 
 
 def apply_differential_privacy(data: pd.DataFrame, epsilon: float, config: MMMConfig = None) -> pd.DataFrame:
@@ -121,12 +99,19 @@ def apply_differential_privacy(data: pd.DataFrame, epsilon: float, config: MMMCo
     provides a formal privacy guarantee that individual-level contributions
     cannot be determined from the model.
 
-    **Updated (Issue #9):** Now uses shifted Laplace mechanism instead of
-    standard Laplace + clipping to avoid introducing bias.
+    Each value gets Laplace noise and is then clamped at zero. Clamping is
+    post-processing, so the guarantee below holds, but it biases values near
+    zero upward (see ``clamped_laplace_mechanism``).
+
+    Scope of the guarantee: within one week, the budget is split evenly over
+    the released columns, so that week's release is epsilon-DP for a person
+    whose contribution to each column is bounded by ``config.sensitivity``.
+    Weeks are released independently. A person who contributes in k weeks
+    is therefore protected at k * epsilon, not epsilon.
 
     Args:
         data: DataFrame with aggregated marketing data
-        epsilon: Privacy budget to be split across all queries
+        epsilon: Privacy budget per week, split across the released columns
         config: MMMConfig instance. If None, uses default configuration.
 
     Returns:
@@ -140,7 +125,7 @@ def apply_differential_privacy(data: pd.DataFrame, epsilon: float, config: MMMCo
         return data.copy()
 
     print(f"\nApplying Differential Privacy with ε={epsilon:.2f}")
-    print(f"Privacy Guarantee: ε={epsilon:.2f}-differential privacy (Laplace mechanism)")
+    print(f"Privacy Guarantee: ε={epsilon:.2f}-differential privacy per weekly release (Laplace mechanism)")
 
     # Create a copy to avoid modifying original data
     private_data = data.copy()
@@ -151,13 +136,13 @@ def apply_differential_privacy(data: pd.DataFrame, epsilon: float, config: MMMCo
     num_queries = len(config.channels) + 1  # channels + revenue
     epsilon_per_query = epsilon / num_queries
 
-    # Add noise to spend data for each channel using shifted Laplace
+    # Add noise to spend data for each channel using clamped Laplace
     for ch in config.channels:
         spend_col = f"spend_{ch}"
         if spend_col in private_data.columns:
-            # Apply shifted Laplace mechanism to ensure non-negative values
+            # Laplace noise, clamped at zero (post-processing)
             private_data[spend_col] = private_data[spend_col].apply(
-                lambda x: shifted_laplace_mechanism(
+                lambda x: clamped_laplace_mechanism(
                     x,
                     config.sensitivity.spend,
                     epsilon_per_query,
@@ -165,10 +150,10 @@ def apply_differential_privacy(data: pd.DataFrame, epsilon: float, config: MMMCo
                 )
             )
 
-    # Add noise to revenue data using shifted Laplace
+    # Add noise to revenue data using clamped Laplace
     if "revenue" in private_data.columns:
         private_data["revenue"] = private_data["revenue"].apply(
-            lambda x: shifted_laplace_mechanism(
+            lambda x: clamped_laplace_mechanism(
                 x,
                 config.sensitivity.revenue,
                 epsilon_per_query,
