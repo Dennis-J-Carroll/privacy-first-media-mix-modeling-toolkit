@@ -53,7 +53,7 @@ Outputs (in `mmm_output_advanced` folder):
 Version 2.0.0 Changes:
 - Refactored into modular mmm package
 - Fixed mROI calculation bug (Issue #1: added chain rule multiplier)
-- Fixed clipping bias (Issue #9: shifted Laplace mechanism)
+- Non-negative outputs via Laplace noise clamped at zero (epsilon-DP; biased near zero)
 - Added convergence checks (Issue #2)
 - Fixed channel colors (Issue #7)
 - Removed delta parameter (Issue #3: not used in Laplace mechanism)
@@ -161,7 +161,7 @@ def main():
     print("PRIVACY-FIRST MMM ANALYSIS COMPLETE")
     print("=" * 70)
     # **Issue #3 Fix:** Removed delta (not used in Laplace mechanism)
-    print(f"\nPrivacy Guarantee: ε={config.epsilon:.2f}-differential privacy (Laplace mechanism)")
+    print(f"\nPrivacy Guarantee: ε={config.epsilon:.2f}-differential privacy per weekly release (Laplace mechanism)")
     print(f"All outputs saved to: {OUTPUT_DIR}/")
     print("\nThis analysis demonstrates responsible AI development by:")
     print("  • Using only aggregated data (privacy by design)")
@@ -169,7 +169,7 @@ def main():
     print("  • Balancing privacy protection with analytical utility")
     print("\nVersion 2.0.0 Improvements:")
     print("  • Fixed mROI calculation (+chain rule for adstock)")
-    print("  • Fixed clipping bias (shifted Laplace mechanism)")
+    print("  • Non-negative outputs via clamped Laplace (epsilon-DP; biased near zero)")
     print("  • Added convergence checks and warnings")
     print("  • Improved channel visualization colors")
     print("=" * 70)

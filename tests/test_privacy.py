@@ -1,14 +1,22 @@
 """
-Tests for privacy mechanisms (Issue #9 Fix)
+Tests for privacy mechanisms.
 
-Verifies that the shifted Laplace mechanism correctly handles
-non-negative constraints without introducing clipping bias.
+Verifies that the clamped Laplace mechanism respects its lower bound, keeps
+the epsilon-DP guarantee of the Laplace mechanism, and has the bias its
+docstring states.
 """
 
 import numpy as np
+import pandas as pd
 import pytest
 
-from mmm.privacy import laplace_mechanism, shifted_laplace_mechanism
+from mmm.config import MMMConfig
+from mmm.privacy import (
+    apply_differential_privacy,
+    clamped_laplace_mechanism,
+    laplace_mechanism,
+    shifted_laplace_mechanism,
+)
 
 
 def test_laplace_mechanism_basic():
@@ -32,149 +40,103 @@ def test_laplace_mechanism_basic():
         f"Std {std} should be close to {expected_std}"
 
 
-def test_shifted_laplace_respects_bounds():
-    """
-    **Issue #9 Test:** Verify shifted Laplace never produces negative values.
-
-    This is the key fix - the shifted mechanism should NEVER return values
-    below the lower bound, avoiding the bias from post-hoc clipping.
-    """
-    value = 100
-    sensitivity = 100
-    epsilon = 1.0
-    lower_bound = 0.0
-
-    # Generate many samples
+def test_clamped_laplace_respects_bounds():
+    """Outputs are never below the lower bound, for several bounds."""
     np.random.seed(42)
-    samples = [shifted_laplace_mechanism(value, sensitivity, epsilon, lower_bound)
-               for _ in range(10000)]
-
-    # ALL samples must be >= lower_bound
-    assert all(s >= lower_bound for s in samples), \
-        f"All samples must be >= {lower_bound}, but found min={min(samples)}"
-
-    # No negative values
-    negative_count = sum(1 for s in samples if s < 0)
-    assert negative_count == 0, f"Found {negative_count} negative values"
+    for value, lower_bound in [(100, 0.0), (1000, 500.0), (0, 0.0)]:
+        samples = [clamped_laplace_mechanism(value, 100, 1.0, lower_bound)
+                   for _ in range(5000)]
+        assert min(samples) >= lower_bound
+        assert np.all(np.isfinite(samples))
 
 
-def test_shifted_laplace_minimal_bias():
-    """
-    Verify that shifted Laplace has minimal bias compared to standard Laplace.
-
-    The bias should be much smaller than the bias from post-hoc clipping.
-    """
-    value = 1000
-    sensitivity = 100
-    epsilon = 1.0
-    lower_bound = 0.0
-
-    # Generate large sample
+def test_clamped_laplace_with_very_low_epsilon():
+    """Very high noise still yields finite, in-bounds outputs."""
     np.random.seed(42)
-    samples = [shifted_laplace_mechanism(value, sensitivity, epsilon, lower_bound)
-               for _ in range(100000)]
+    samples = [clamped_laplace_mechanism(100, 1000, 0.01, 0.0) for _ in range(1000)]
+    assert min(samples) >= 0.0
+    assert np.all(np.isfinite(samples))
 
-    # Calculate bias
-    mean = np.mean(samples)
-    bias = abs(mean - value)
 
-    # Bias should be small relative to scale
+@pytest.mark.parametrize("epsilon", [0.25, 1.0])
+def test_clamped_laplace_privacy_loss_within_epsilon(epsilon):
+    """
+    The empirical privacy loss between neighbouring inputs stays within epsilon.
+
+    Uses the worst case for a bounded mechanism: one neighbour sits on the
+    bound, the other is one sensitivity above it. Outputs are binned (the
+    clamp's point mass at the bound gets its own bin) and every bin's
+    probability ratio must be at most e^epsilon, in both directions.
+
+    A truncated-Laplace sampler fails this: its ratio just above the bound is
+    2*e^eps - 1 (4.44 instead of 2.72 at eps = 1).
+    """
+    sensitivity = 1000.0
     scale = sensitivity / epsilon
-    relative_bias = bias / scale
-
-    # Bias should be less than 5% of scale
-    assert relative_bias < 0.05, \
-        f"Bias {bias:.2f} ({relative_bias:.1%} of scale) is too large"
-
-
-def test_shifted_laplace_vs_clipped_laplace_bias():
-    """
-    Compare shifted Laplace vs post-hoc clipping to verify bias reduction.
-
-    Post-hoc clipping introduces downward bias. Shifted Laplace should
-    have much less bias.
-
-    Uses value well above lower bound to avoid excessive rejection sampling
-    in the shifted mechanism, which would skew results.
-    """
-    value = 5000  # Well above lower bound (rejection sampling rarely triggers)
-    sensitivity = 1000
-    epsilon = 1.0  # Moderate epsilon for clearer signal
-    lower_bound = 0.0
+    n = 400_000
 
     np.random.seed(42)
-    n_samples = 10000
+    a = np.array([clamped_laplace_mechanism(0.0, sensitivity, epsilon) for _ in range(n)])
+    b = np.array([clamped_laplace_mechanism(sensitivity, sensitivity, epsilon) for _ in range(n)])
 
-    # Shifted Laplace (new method)
-    shifted_samples = [
-        shifted_laplace_mechanism(value, sensitivity, epsilon, lower_bound)
-        for _ in range(n_samples)
-    ]
+    # Bin 0 holds exactly the clamped outputs. The next bin is narrow because
+    # the worst case for a bounded mechanism sits right at the bound.
+    edges = np.concatenate(([-1.0, 1e-9, 0.05 * scale], np.linspace(0.25 * scale, 4 * scale, 16)))
+    pa = np.histogram(a, edges)[0] / n
+    pb = np.histogram(b, edges)[0] / n
+    assert pa.min() > 0.002 and pb.min() > 0.002, "bins too sparse to compare"
 
-    # Standard Laplace + clipping (old method)
-    clipped_samples = []
-    for _ in range(n_samples):
-        noisy = laplace_mechanism(value, sensitivity, epsilon)
-        clipped = max(noisy, lower_bound)  # Post-hoc clip
-        clipped_samples.append(clipped)
-
-    shifted_mean = np.mean(shifted_samples)
-    clipped_mean = np.mean(clipped_samples)
-
-    # Clipped version should have larger downward bias
-    shifted_bias = abs(shifted_mean - value)
-    clipped_bias = abs(clipped_mean - value)
-
-    # For this parameter set, clipping bias should be significantly larger
-    # (since many samples get clipped)
-    assert clipped_bias > shifted_bias, \
-        f"Clipped bias ({clipped_bias:.2f}) should be larger than shifted bias ({shifted_bias:.2f})"
+    worst = max((pa / pb).max(), (pb / pa).max())
+    # 5% slack covers sampling error at this n; truncation overshoots by 20%+.
+    assert worst <= np.exp(epsilon) * 1.05, \
+        f"Privacy loss ratio {worst:.3f} exceeds e^eps = {np.exp(epsilon):.3f}"
 
 
-def test_shifted_laplace_convergence():
+def test_clamped_laplace_bias_matches_documented_formula():
     """
-    Verify that shifted Laplace converges quickly (few rejection samples needed).
+    Clamping biases outputs upward by (scale/2) * exp(-(value - bound)/scale).
 
-    For reasonable epsilon values, rejection sampling should succeed in 1-2 attempts.
+    Checked near the bound, where the bias is large, and far from it, where
+    it is negligible.
     """
-    value = 1000
-    sensitivity = 100
-    epsilon = 1.0  # Reasonable epsilon
-    lower_bound = 0.0
+    sensitivity, epsilon = 1000.0, 0.25
+    scale = sensitivity / epsilon
+    n = 200_000
 
-    # This should succeed without infinite loops
-    # (if it hangs, there's a bug in the rejection sampling)
     np.random.seed(42)
-    for _ in range(100):
-        result = shifted_laplace_mechanism(value, sensitivity, epsilon, lower_bound)
-        assert result >= lower_bound
-        assert not np.isnan(result)
-        assert not np.isinf(result)
+    for value in (2000.0, 20000.0):
+        samples = [clamped_laplace_mechanism(value, sensitivity, epsilon) for _ in range(n)]
+        bias = np.mean(samples) - value
+        expected = 0.5 * scale * np.exp(-value / scale)
+        # Standard error of the mean is about scale*sqrt(2/n) ~= 13.
+        assert abs(bias - expected) < 60, \
+            f"value={value}: bias {bias:.1f}, expected {expected:.1f}"
 
 
-def test_shifted_laplace_with_very_low_epsilon():
-    """
-    Test that shifted Laplace handles very low epsilon gracefully.
+def test_shifted_name_is_alias_for_clamped():
+    """The deprecated name must not resurrect the truncated sampler."""
+    assert shifted_laplace_mechanism is clamped_laplace_mechanism
 
-    With very low epsilon (high noise), rejection sampling might fail,
-    but should fallback to lower_bound rather than looping forever.
-    """
-    value = 100
-    sensitivity = 1000
-    epsilon = 0.01  # Very low epsilon → very high noise
-    lower_bound = 0.0
 
-    # Should not hang or crash
+def test_apply_differential_privacy_outputs_non_negative(capsys):
+    """The pipeline releases non-negative spend and revenue, other columns untouched."""
+    config = MMMConfig()
     np.random.seed(42)
-    samples = [shifted_laplace_mechanism(value, sensitivity, epsilon, lower_bound)
-               for _ in range(100)]
+    data = pd.DataFrame({
+        "week": np.arange(1, 201),
+        **{f"spend_{ch}": np.full(200, 500.0) for ch in config.channels},
+        "revenue": np.full(200, 300.0),
+        "promotions": np.zeros(200, dtype=int),
+    })
 
-    # All samples should be valid
-    assert all(s >= lower_bound for s in samples)
-    assert all(not np.isnan(s) for s in samples)
+    private = apply_differential_privacy(data, epsilon=1.0, config=config)
+    capsys.readouterr()
 
-    # Many samples will be at the lower bound (fallback case)
-    # This is expected with such high noise
+    for col in [f"spend_{ch}" for ch in config.channels] + ["revenue"]:
+        assert (private[col] >= 0).all()
+        assert not private[col].equals(data[col])
+    assert private["week"].equals(data["week"])
+    assert private["promotions"].equals(data["promotions"])
 
 
 def test_epsilon_validation():
@@ -186,24 +148,7 @@ def test_epsilon_validation():
         laplace_mechanism(100, 10, epsilon=-1.0)
 
     with pytest.raises(ValueError):
-        shifted_laplace_mechanism(100, 10, epsilon=0)
-
-
-def test_shifted_laplace_different_bounds():
-    """Test shifted Laplace with different lower bounds."""
-    value = 1000
-    sensitivity = 100
-    epsilon = 1.0
-
-    # Test with lower_bound = 0
-    samples_0 = [shifted_laplace_mechanism(value, sensitivity, epsilon, 0.0)
-                 for _ in range(1000)]
-    assert all(s >= 0.0 for s in samples_0)
-
-    # Test with lower_bound = 500
-    samples_500 = [shifted_laplace_mechanism(value, sensitivity, epsilon, 500.0)
-                   for _ in range(1000)]
-    assert all(s >= 500.0 for s in samples_500)
+        clamped_laplace_mechanism(100, 10, epsilon=0)
 
 
 if __name__ == "__main__":

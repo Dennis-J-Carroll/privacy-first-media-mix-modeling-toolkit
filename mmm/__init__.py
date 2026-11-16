@@ -7,7 +7,7 @@ differential privacy guarantees.
 
 This package provides:
 - Core MMM mathematical functions (adstock, saturation)
-- Differential privacy mechanisms (Laplace, shifted Laplace)
+- Differential privacy mechanisms (Laplace, clamped Laplace)
 - Synthetic data generation
 - Model fitting and optimization
 - Analysis and metrics calculation
@@ -49,6 +49,7 @@ from .core import geometric_adstock, hill_function
 # Privacy mechanisms
 from .privacy import (
     laplace_mechanism,
+    clamped_laplace_mechanism,
     shifted_laplace_mechanism,
     apply_differential_privacy
 )
@@ -88,6 +89,7 @@ __all__ = [
 
     # Privacy
     "laplace_mechanism",
+    "clamped_laplace_mechanism",
     "shifted_laplace_mechanism",
     "apply_differential_privacy",
 
