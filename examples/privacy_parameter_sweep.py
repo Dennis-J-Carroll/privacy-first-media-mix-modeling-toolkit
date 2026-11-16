@@ -19,14 +19,14 @@ Usage:
 import os
 import sys
 
-# Add parent directory to path to import advanced_mmm
+# Add parent directory to path to import the mmm package
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-from advanced_mmm import (
+from mmm import (
     generate_weekly_data,
     apply_differential_privacy,
     fit_model,
@@ -184,7 +184,7 @@ def run_epsilon_comparison():
         private_data = apply_differential_privacy(base_data, epsilon)
 
         # Fit model
-        fitted_params = fit_model(private_data)
+        fitted_params = fit_model(private_data)["fitted_params"]
         fitted_params_by_epsilon[epsilon] = fitted_params
 
         # Calculate metrics

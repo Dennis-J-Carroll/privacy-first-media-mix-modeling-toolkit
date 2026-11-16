@@ -27,6 +27,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+from dataclasses import asdict
 from io import BytesIO
 
 # Import core MMM functions from new mmm package
@@ -34,7 +35,7 @@ from mmm import (
     generate_weekly_data,
     apply_differential_privacy,
     fit_model,
-    CONFIG,
+    MMMConfig,
     CHANNEL_COLORS,
     geometric_adstock,
     hill_function,
@@ -123,25 +124,23 @@ with st.expander("ℹ️ What does ε mean?"):
 if st.button("🚀 Run Analysis", use_container_width=True):
 
     with st.spinner("Generating synthetic data..."):
-        # Update config
-        CONFIG["num_weeks"] = num_weeks
-        CONFIG["epsilon"] = epsilon
-        CONFIG["noise_std"] = noise_std
+        # MMMConfig is immutable, so build one from the current controls
+        config = MMMConfig(num_weeks=num_weeks, epsilon=epsilon, noise_std=noise_std)
 
         # Generate data
-        df_original = generate_weekly_data()
+        df_original = generate_weekly_data(config)
 
     st.success("✅ Data generated!")
 
     with st.spinner("Applying differential privacy..."):
         # Apply privacy
-        df_private = apply_differential_privacy(df_original, epsilon)
+        df_private = apply_differential_privacy(df_original, epsilon, config)
 
     st.success(f"✅ Privacy applied (ε = {epsilon})")
 
     with st.spinner("Fitting MMM model..."):
         # Fit model
-        results = fit_model(df_private)
+        results = fit_model(df_private, config)
 
     st.success("✅ Model fitted!")
 
@@ -150,6 +149,7 @@ if st.button("🚀 Run Analysis", use_container_width=True):
     st.session_state['df_original'] = df_original
     st.session_state['df_private'] = df_private
     st.session_state['epsilon'] = epsilon
+    st.session_state['config'] = config
 
 # Display results if available
 if 'results' in st.session_state:
@@ -158,19 +158,20 @@ if 'results' in st.session_state:
     df_original = st.session_state['df_original']
     df_private = st.session_state['df_private']
     epsilon_used = st.session_state['epsilon']
+    config = st.session_state['config']
 
     st.header("📊 Results")
 
     # Key metrics in columns (mobile-friendly)
     st.subheader("💰 Return on Investment (ROI)")
 
-    channels = CONFIG["channels"]
+    channels = config.channels
     cols = st.columns(len(channels))
 
     for i, channel in enumerate(channels):
         with cols[i]:
             fitted = results['fitted_params'][channel]
-            true = CONFIG['true_params'][channel]
+            true = asdict(getattr(config.true_params, channel))
 
             # Calculate mROI at current spend level
             avg_spend = df_private[f"spend_{channel}"].mean()
@@ -205,7 +206,7 @@ if 'results' in st.session_state:
         st.info(f"""
         **Privacy Impact Analysis** (ε = {epsilon_used})
 
-        - Added noise scale: {1.0/epsilon_used:.2f}x sensitivity
+        - Added noise scale: {(len(channels) + 1)/epsilon_used:.2f}x sensitivity (ε is split across {len(channels) + 1} released columns)
         - Privacy guarantee: Individual contributions protected with ε = {epsilon_used}
         - Model accuracy (R²): {r_squared:.3f}
         """)
@@ -216,7 +217,7 @@ if 'results' in st.session_state:
     param_data = []
     for channel in channels:
         fitted = results['fitted_params'][channel]
-        true = CONFIG['true_params'][channel]
+        true = asdict(getattr(config.true_params, channel))
 
         for param_name in ['adstock_decay', 'hill_alpha', 'hill_K', 'hill_beta']:
             param_data.append({
@@ -254,7 +255,7 @@ if 'results' in st.session_state:
         ax = axes[i]
 
         fitted = results['fitted_params'][channel]
-        true = CONFIG['true_params'][channel]
+        true = asdict(getattr(config.true_params, channel))
 
         # Generate spend range
         max_spend = df_private[f"spend_{channel}"].max() * 1.5
