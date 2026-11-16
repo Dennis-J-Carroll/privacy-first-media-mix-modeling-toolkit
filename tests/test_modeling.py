@@ -9,7 +9,14 @@ import warnings
 import numpy as np
 import pytest
 
-from mmm import MMMConfig, generate_weekly_data, apply_differential_privacy, fit_model
+from mmm import (
+    MMMConfig,
+    generate_weekly_data,
+    apply_differential_privacy,
+    fit_model,
+    objective_function,
+    calculate_marginal_roi,
+)
 
 
 def test_fit_model_returns_convergence_info():
@@ -149,6 +156,84 @@ def test_fit_model_predictions_correct_length():
 
     assert results['predictions'].shape[0] == 78, \
         f"Predictions should have length 78, got {results['predictions'].shape[0]}"
+
+
+def _clean_fit(seed=42):
+    """Fit synthetic data with no privacy noise; returns (config, df, results)."""
+    np.random.seed(seed)
+    config = MMMConfig(num_weeks=104, enable_privacy=False)
+    df = generate_weekly_data(config)
+    return config, df, fit_model(df, config)
+
+
+def test_fit_model_beats_ground_truth_sse_without_privacy():
+    """
+    The optimizer must find a fit at least as good as the true parameters.
+
+    This checks the optimizer, not the luck of a seed: the simulation's own
+    parameters are a feasible point, so a working least-squares fit cannot
+    end with a higher SSE than they give. On unscaled parameters L-BFGS-B
+    stopped at roughly 2.7x that SSE, with hill_K and hill_beta left near
+    their starting values and identical for every channel.
+    """
+    config, df, results = _clean_fit()
+
+    args = ('adstock_decay', 'hill_alpha', 'hill_K', 'hill_beta')
+    true_vector = [getattr(getattr(config.true_params, ch), a)
+                   for ch in config.channels for a in args]
+    true_vector.append(config.true_params.promo_effect)
+    true_sse = objective_function(np.array(true_vector, dtype=float), df, config)
+
+    assert results['sse'] <= true_sse
+    assert results['r_squared'] > 0.95
+
+
+def test_fit_model_recovers_marginal_roi_without_privacy():
+    """
+    Marginal ROI at a typical spend level lands near the truth.
+
+    This is asserted on mROI rather than on hill_K / hill_beta because those
+    two are only weakly identified by 104 weeks of data: different pairs give
+    nearly the same curve over the observed spend range, and fits that beat
+    the true parameters on SSE can still be 50% off on either one.
+    """
+    config, _, results = _clean_fit()
+    args = ('adstock_decay', 'hill_alpha', 'hill_K', 'hill_beta')
+
+    for ch in config.channels:
+        true = getattr(config.true_params, ch)
+        est = results['fitted_params'][ch]
+        true_mroi = calculate_marginal_roi(10000, *[getattr(true, a) for a in args])
+        est_mroi = calculate_marginal_roi(10000, *[est[a] for a in args])
+        assert abs(est_mroi - true_mroi) < 0.2, \
+            f"{ch}: mROI {est_mroi:.3f} vs true {true_mroi:.3f}"
+
+
+def test_fit_model_is_reproducible_and_leaves_global_rng_alone():
+    """Same data gives the same fit, and fitting does not consume np.random."""
+    config, df, first = _clean_fit()
+
+    np.random.seed(123)
+    expected_next = np.random.rand()
+    np.random.seed(123)
+    second = fit_model(df, config)
+    assert np.random.rand() == expected_next
+
+    assert first['sse'] == second['sse']
+
+
+def test_fit_model_more_starts_never_worse():
+    """The first start is fixed, so adding starts can only lower the SSE."""
+    np.random.seed(42)
+    config = MMMConfig(num_weeks=104, enable_privacy=False)
+    df = generate_weekly_data(config)
+
+    single = fit_model(df, config, n_starts=1)
+    multi = fit_model(df, config, n_starts=4)
+    assert multi['sse'] <= single['sse']
+
+    with pytest.raises(ValueError):
+        fit_model(df, config, n_starts=0)
 
 
 if __name__ == "__main__":
